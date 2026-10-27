@@ -1,14 +1,16 @@
 import React, { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
 import { CategoryList } from '../components/CategoryList';
 import { ProductGrid } from '../components/ProductGrid';
 import { SearchBar } from '../components/SearchBar';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
 import { useCatalog } from '../context/CatalogContext';
 import { filterProducts } from '../utils/catalog';
+import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 export const CatalogPage: React.FC = () => {
-  const { products, categories, loading, error, accessNotice, refreshCatalog } = useCatalog();
+  const { products, categories, loading, error, refreshCatalog } = useCatalog();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const query = searchParams.get('q') ?? '';
@@ -58,12 +60,20 @@ export const CatalogPage: React.FC = () => {
         </p>
       </div>
 
-      {error && (
+      {error && !loading && products.length > 0 && (
         <div
           role="alert"
-          className="rounded-xl bg-[#1A1A1A] border border-[#FFC400]/40 px-4 py-3 text-xs text-[#8A8A8A]"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-white/15 px-4 py-3 text-xs text-white/90"
         >
-          <strong className="text-[#FFC400]">Aviso:</strong> {error}
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void refreshCatalog()}
+            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#0A0A0A] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer shrink-0"
+          >
+            <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <span>Tentar novamente</span>
+          </button>
         </div>
       )}
 
@@ -78,7 +88,7 @@ export const CatalogPage: React.FC = () => {
           categories={categories}
           selectedCategory={selectedCategory}
           onSelectCategory={(cat) => updateParam('categoria', cat)}
-          totalCount={loading ? undefined : products.length}
+          totalCount={loading || (error && products.length === 0) ? undefined : products.length}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
@@ -110,7 +120,7 @@ export const CatalogPage: React.FC = () => {
             </button>
           </div>
 
-          {!loading && (
+          {!loading && !(error && products.length === 0) && (
             <div className="flex items-center gap-3 text-xs text-[#8A8A8A]">
               <span className="tabular-nums">
                 {filteredProducts.length}{' '}
@@ -133,19 +143,28 @@ export const CatalogPage: React.FC = () => {
       <ProductGrid
         products={filteredProducts}
         loading={loading}
+        error={error}
         emptyTitle={
-          hasAnyFilter
+          query.trim().length > 0 || onlyAvailable
             ? 'Nenhum produto encontrado'
-            : 'Nenhum produto publicado disponível'
+            : selectedCategory !== 'all'
+            ? 'Sem produtos nesta categoria'
+            : onlyPromos
+            ? 'Sem promoções de momento'
+            : 'Sem produtos disponíveis de momento'
         }
         emptyDescription={
-          hasAnyFilter
-            ? 'Não encontrámos artigos para esta pesquisa ou filtro. Tenta usar outras palavras ou limpa os filtros.'
-            : accessNotice ??
-              'Assim que os produtos forem publicados no Painel Administrativo da Bercali Store, ficarão listados neste catálogo.'
+          query.trim().length > 0 || onlyAvailable
+            ? PUBLIC_MESSAGES.emptySearch
+            : selectedCategory !== 'all'
+            ? PUBLIC_MESSAGES.emptyCategory
+            : onlyPromos
+            ? PUBLIC_MESSAGES.emptyPromotions
+            : PUBLIC_MESSAGES.emptyCatalog
         }
         onResetFilters={hasAnyFilter ? resetAllFilters : undefined}
         onRefresh={!hasAnyFilter ? () => void refreshCatalog() : undefined}
+        onRetry={() => void refreshCatalog()}
       />
     </div>
   );

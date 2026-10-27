@@ -15,6 +15,7 @@ import type {
   PublicStoreSettings,
   StoreCategory,
 } from '../types/store';
+import type { CatalogErrorKind } from '../utils/publicMessages';
 import { createDefaultPublicStoreSettings } from '../utils/supabaseMapper';
 
 interface RefreshCatalogOptions {
@@ -28,6 +29,7 @@ interface CatalogContextValue {
   isStoreActive: boolean;
   loading: boolean;
   error: string | null;
+  errorKind: CatalogErrorKind;
   accessNotice: string | null;
   configured: boolean;
   whatsappNumber: string;
@@ -47,46 +49,80 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<CatalogErrorKind>('none');
   const [accessNotice, setAccessNotice] = useState<string | null>(null);
 
   const lastFetchAtRef = useRef<number>(0);
   const hasLoadedOnceRef = useRef<boolean>(false);
+  const hasProductsRef = useRef<boolean>(false);
+  const isFetchingRef = useRef<boolean>(false);
 
   const loadCatalog = useCallback(async (options?: RefreshCatalogOptions) => {
-    const silent = Boolean(options?.silent && hasLoadedOnceRef.current);
-    if (!silent) {
-      setLoading(true);
+    const requestedSilent = Boolean(options?.silent);
+    if (requestedSilent && isFetchingRef.current) {
+      return;
     }
 
-    const result = await fetchStorefrontCatalog();
-    lastFetchAtRef.current = Date.now();
-    hasLoadedOnceRef.current = true;
+    const silent = Boolean(requestedSilent && hasLoadedOnceRef.current);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+      setErrorKind('none');
+    }
 
-    setProducts(result.products);
-    setCategories(result.categories);
-    setStoreSettings(result.storeSettings);
-    setError(result.error);
-    setAccessNotice(result.accessNotice);
-    setLoading(false);
+    isFetchingRef.current = true;
+    try {
+      const result = await fetchStorefrontCatalog();
+      lastFetchAtRef.current = Date.now();
+      hasLoadedOnceRef.current = true;
+
+      // Se uma atualização silenciosa em segundo plano falhar mas já existirem produtos carregados,
+      // preserva o catálogo visível ao cliente para não interromper a compra em curso.
+      if (silent && result.error && hasProductsRef.current) {
+        setLoading(false);
+        return;
+      }
+
+      hasProductsRef.current = result.products.length > 0;
+      setProducts(result.products);
+      setCategories(result.categories);
+      setStoreSettings(result.storeSettings);
+      setError(result.error);
+      setErrorKind(result.errorKind);
+      setAccessNotice(result.accessNotice);
+      setLoading(false);
+    } finally {
+      isFetchingRef.current = false;
+    }
   }, []);
 
   // Carregamento inicial
   useEffect(() => {
     let active = true;
+    isFetchingRef.current = true;
     void (async () => {
-      const result = await fetchStorefrontCatalog();
-      if (!active) return;
-      lastFetchAtRef.current = Date.now();
-      hasLoadedOnceRef.current = true;
-      setProducts(result.products);
-      setCategories(result.categories);
-      setStoreSettings(result.storeSettings);
-      setError(result.error);
-      setAccessNotice(result.accessNotice);
-      setLoading(false);
+      try {
+        const result = await fetchStorefrontCatalog();
+        if (!active) return;
+        lastFetchAtRef.current = Date.now();
+        hasLoadedOnceRef.current = true;
+        hasProductsRef.current = result.products.length > 0;
+        setProducts(result.products);
+        setCategories(result.categories);
+        setStoreSettings(result.storeSettings);
+        setError(result.error);
+        setErrorKind(result.errorKind);
+        setAccessNotice(result.accessNotice);
+        setLoading(false);
+      } finally {
+        if (active) {
+          isFetchingRef.current = false;
+        }
+      }
     })();
     return () => {
       active = false;
+      isFetchingRef.current = false;
     };
   }, []);
 
@@ -159,13 +195,14 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isStoreActive: storeSettings.isStoreActive,
       loading,
       error,
+      errorKind,
       accessNotice,
       configured: SUPABASE_CONFIG_STATUS.configured,
       whatsappNumber: storeSettings.whatsappNumber,
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       refreshCatalog: loadCatalog,
     }),
-    [products, categories, storeSettings, loading, error, accessNotice, loadCatalog]
+    [products, categories, storeSettings, loading, error, errorKind, accessNotice, loadCatalog]
   );
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

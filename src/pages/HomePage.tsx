@@ -15,6 +15,7 @@ import {
   getPromotionalProducts,
 } from '../utils/catalog';
 import { buildWhatsAppUrl } from '../utils/checkout';
+import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 type CatalogTab = 'all' | 'new' | 'promos';
 
@@ -25,7 +26,6 @@ export const HomePage: React.FC = () => {
     storeSettings,
     loading,
     error,
-    accessNotice,
     whatsappNumber,
     refreshCatalog,
   } = useCatalog();
@@ -159,14 +159,12 @@ export const HomePage: React.FC = () => {
       </section>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14">
-        {error && (
+        {error && !loading && products.length > 0 && (
           <div
             role="alert"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-[#FFC400]/40 px-4 py-3 text-xs text-[#8A8A8A]"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-white/15 px-4 py-3 text-xs text-white/90"
           >
-            <span>
-              <strong className="text-[#FFC400]">Aviso de ligação:</strong> {error}
-            </span>
+            <span>{error}</span>
             <button
               type="button"
               onClick={() => void refreshCatalog()}
@@ -274,17 +272,17 @@ export const HomePage: React.FC = () => {
 
           <div className="space-y-3.5">
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
-            {(categories.length > 0 || !loading) && (
+            {(categories.length > 0 || (!loading && !error)) && (
               <CategoryList
                 categories={categories}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                totalCount={loading ? undefined : products.length}
+                totalCount={loading || (error && products.length === 0) ? undefined : products.length}
               />
             )}
           </div>
 
-          {isFiltering && !loading && (
+          {isFiltering && !loading && !(error && products.length === 0) && (
             <div className="flex items-center justify-between gap-2 text-xs text-[#8A8A8A]">
               <span>
                 {displayedCatalogProducts.length}{' '}
@@ -305,19 +303,28 @@ export const HomePage: React.FC = () => {
           <ProductGrid
             products={displayedCatalogProducts}
             loading={loading}
+            error={error}
             emptyTitle={
-              isFiltering
+              searchQuery.trim().length > 0
                 ? 'Nenhum produto encontrado'
-                : 'Nenhum produto publicado disponível'
+                : selectedCategory !== 'all'
+                ? 'Sem produtos nesta categoria'
+                : activeTab === 'promos'
+                ? 'Sem promoções de momento'
+                : 'Sem produtos disponíveis de momento'
             }
             emptyDescription={
-              isFiltering
-                ? 'Não encontrámos artigos para esta pesquisa ou filtro. Tenta usar outras palavras ou limpa os filtros.'
-                : accessNotice ??
-                  'Ainda não existem produtos publicados visíveis no catálogo ou aguarda-se atualização a partir do Painel Administrativo.'
+              searchQuery.trim().length > 0
+                ? PUBLIC_MESSAGES.emptySearch
+                : selectedCategory !== 'all'
+                ? PUBLIC_MESSAGES.emptyCategory
+                : activeTab === 'promos'
+                ? PUBLIC_MESSAGES.emptyPromotions
+                : PUBLIC_MESSAGES.emptyCatalog
             }
             onResetFilters={isFiltering ? handleResetFilters : undefined}
             onRefresh={!isFiltering ? () => void refreshCatalog() : undefined}
+            onRetry={() => void refreshCatalog()}
           />
         </section>
       </div>

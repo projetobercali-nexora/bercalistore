@@ -4,13 +4,36 @@ export type SupabaseKeyValidationResult =
   | { valid: true }
   | { valid: false; reason: 'missing' | 'forbidden_secret_key' | 'invalid_format' };
 
+export function sanitizeEnvValue(raw: string | undefined): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  let cleaned = raw.trim();
+  if (!cleaned) return undefined;
+
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.length >= 2) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'") && cleaned.length >= 2)
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+
+  return cleaned || undefined;
+}
+
+export function normalizeSupabaseUrl(rawUrl: string | undefined): string | undefined {
+  const cleaned = sanitizeEnvValue(rawUrl);
+  if (!cleaned) return undefined;
+  return cleaned.replace(/\/+$/, '');
+}
+
 export function isValidSupabaseUrl(rawUrl: string | undefined): boolean {
-  if (!rawUrl) return false;
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return false;
+  const normalized = normalizeSupabaseUrl(rawUrl);
+  if (!normalized) return false;
   try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' || (parsed.protocol === 'http:' && parsed.hostname === 'localhost');
+    const parsed = new URL(normalized);
+    return (
+      parsed.protocol === 'https:' ||
+      (parsed.protocol === 'http:' && parsed.hostname === 'localhost')
+    );
   } catch {
     return false;
   }
@@ -36,11 +59,10 @@ function decodeBase64UrlJson(segment: string): Record<string, unknown> | null {
  * bloqueando explicitamente chaves secretas (service_role ou sb_secret_*).
  */
 export function validatePublicSupabaseKey(rawKey: string | undefined): SupabaseKeyValidationResult {
-  if (!rawKey || !rawKey.trim()) {
+  const key = sanitizeEnvValue(rawKey);
+  if (!key) {
     return { valid: false, reason: 'missing' };
   }
-
-  const key = rawKey.trim();
 
   // Bloqueio explícito das novas chaves secretas do Supabase
   if (key.startsWith('sb_secret_')) {
@@ -68,35 +90,149 @@ export function validatePublicSupabaseKey(rawKey: string | undefined): SupabaseK
   return { valid: false, reason: 'invalid_format' };
 }
 
+export interface ResolvedSupabasePublicEnv {
+  url: string | undefined;
+  anonKey: string | undefined;
+  urlSource: string | null;
+  keySource: string | null;
+  urlValid: boolean;
+  keyValidation: SupabaseKeyValidationResult;
+  configured: boolean;
+}
+
+const URL_ENV_CANDIDATES = ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL'] as const;
+
+const KEY_ENV_CANDIDATES = [
+  'VITE_SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
+  'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+] as const;
+
+export function resolveSupabasePublicEnv(
+  envRecord: Record<string, string | undefined>
+): ResolvedSupabasePublicEnv {
+  let resolvedUrl: string | undefined;
+  let urlSource: string | null = null;
+
+  for (const name of URL_ENV_CANDIDATES) {
+    const candidate = normalizeSupabaseUrl(envRecord[name]);
+    if (candidate) {
+      resolvedUrl = candidate;
+      urlSource = name;
+      break;
+    }
+  }
+
+  let resolvedKey: string | undefined;
+  let keySource: string | null = null;
+
+  for (const name of KEY_ENV_CANDIDATES) {
+    const candidate = sanitizeEnvValue(envRecord[name]);
+    if (candidate) {
+      resolvedKey = candidate;
+      keySource = name;
+      break;
+    }
+  }
+
+  const urlOk = isValidSupabaseUrl(resolvedUrl);
+  const keyCheck = validatePublicSupabaseKey(resolvedKey);
+
+  return {
+    url: urlOk && resolvedUrl ? resolvedUrl : undefined,
+    anonKey: keyCheck.valid && resolvedKey ? resolvedKey : undefined,
+    urlSource,
+    keySource,
+    urlValid: urlOk,
+    keyValidation: keyCheck,
+    configured: Boolean(urlOk && keyCheck.valid && resolvedUrl && resolvedKey),
+  };
+}
+
 const env =
   (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-const supabaseUrl = env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY?.trim();
+const resolvedEnv = resolveSupabasePublicEnv(env);
 
-const urlOk = isValidSupabaseUrl(supabaseUrl);
-const keyCheck = validatePublicSupabaseKey(supabaseAnonKey);
+if (!resolvedEnv.configured && typeof console !== 'undefined') {
+  const diagnostics: string[] = [];
+  if (!resolvedEnv.urlValid) {
+    diagnostics.push(
+      resolvedEnv.urlSource
+        ? `Variável ${resolvedEnv.urlSource} tem formato de URL inválido (esperado https://<projeto>.supabase.co).`
+        : 'Variável VITE_SUPABASE_URL não encontrada no ambiente de compilação.'
+    );
+  }
+  if (!resolvedEnv.keyValidation.valid) {
+    if (resolvedEnv.keyValidation.reason === 'missing') {
+      diagnostics.push('Variável VITE_SUPABASE_ANON_KEY não encontrada no ambiente de compilação.');
+    } else if (resolvedEnv.keyValidation.reason === 'forbidden_secret_key') {
+      diagnostics.push(
+        `Chave em ${resolvedEnv.keySource ?? 'VITE_SUPABASE_ANON_KEY'} rejeitada por segurança: nunca uses service_role ou sb_secret_ no frontend.`
+      );
+    } else {
+      diagnostics.push(
+        `Variável ${resolvedEnv.keySource ?? 'VITE_SUPABASE_ANON_KEY'} tem formato inválido.`
+      );
+    }
+  }
+  console.error('[Bercali Store · Diagnóstico Privado]', diagnostics.join(' '));
+}
 
-export const SUPABASE_PUBLIC_URL: string | undefined =
-  urlOk && supabaseUrl ? supabaseUrl : undefined;
+export const SUPABASE_PUBLIC_URL: string | undefined = resolvedEnv.url;
 
 export const SUPABASE_CONFIG_STATUS = {
-  configured: urlOk && keyCheck.valid,
-  urlValid: urlOk,
-  keyValidation: keyCheck,
+  configured: resolvedEnv.configured,
+  urlValid: resolvedEnv.urlValid,
+  keyValidation: resolvedEnv.keyValidation,
+  urlSource: resolvedEnv.urlSource,
+  keySource: resolvedEnv.keySource,
 } as const;
 
 /**
  * Cliente público do Supabase partilhado com o projeto da base de dados do Painel Administrativo.
  * Mantém persistSession: false na loja pública para não criar sessões desnecessárias para visitantes.
  */
+const REQUEST_TIMEOUT_MS = 12000;
+
+const storefrontFetch: typeof fetch = async (input, init) => {
+  const headers = new Headers(init?.headers);
+  const retryCount = Number(headers.get('X-Retry-Count') ?? '0');
+
+  // Permite 1 nova tentativa automática rápida (~1s) em micro-quedas móveis,
+  // evitando que o cliente fique preso mais de 8 segundos num ecrã de carregamento sem rede.
+  if (retryCount > 1) {
+    const fastFailError = new Error('Network request failed');
+    fastFailError.name = 'AbortError';
+    throw fastFailError;
+  }
+
+  if (typeof AbortController === 'undefined' || init?.signal) {
+    return fetch(input, init);
+  }
+
+  const controller = new AbortController();
+  const timer = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    globalThis.clearTimeout(timer);
+  }
+};
+
 export const supabase: SupabaseClient | null =
-  urlOk && keyCheck.valid && supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, {
+  resolvedEnv.configured && resolvedEnv.url && resolvedEnv.anonKey
+    ? createClient(resolvedEnv.url, resolvedEnv.anonKey, {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
           detectSessionInUrl: false,
+        },
+        global: {
+          fetch: storefrontFetch,
         },
       })
     : null;

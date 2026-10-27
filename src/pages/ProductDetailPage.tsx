@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Lock, MessageCircle, Minus, Plus, ShoppingBag, Zap } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  Lock,
+  MessageCircle,
+  Minus,
+  Plus,
+  RefreshCw,
+  ShoppingBag,
+  Zap,
+} from 'lucide-react';
 import { ProductGallery } from '../components/ProductGallery';
 import { ProductGrid } from '../components/ProductGrid';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
@@ -18,11 +29,20 @@ import {
   isProductPurchasable,
   slugifyCategory,
 } from '../utils/format';
+import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 export const ProductDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { products, loading, isStoreActive, storeSettings, whatsappNumber } = useCatalog();
+  const {
+    products,
+    loading,
+    error,
+    isStoreActive,
+    storeSettings,
+    whatsappNumber,
+    refreshCatalog,
+  } = useCatalog();
   const { addItem, getQuantityInCart } = useCart();
 
   const product = useMemo(
@@ -68,15 +88,46 @@ export const ProductDetailPage: React.FC = () => {
     );
   }
 
+  if (!product && error) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 py-16">
+        <div
+          role="alert"
+          className="rounded-xl bg-[#1A1A1A] border border-white/15 p-8 sm:p-10 text-center space-y-4"
+        >
+          <AlertCircle className="mx-auto h-10 w-10 text-[#FFC400]" aria-hidden="true" />
+          <h1 className="font-display text-2xl font-extrabold text-white">
+            Não foi possível carregar este produto
+          </h1>
+          <p className="text-sm text-[#8A8A8A] leading-relaxed">{error}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => void refreshCatalog()}
+              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-2.5 font-display text-xs font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span>Tentar novamente</span>
+            </button>
+            <Link
+              to="/catalogo"
+              className="inline-flex min-h-[46px] items-center justify-center rounded-xl border border-white/15 bg-[#0A0A0A] px-5 py-2.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors"
+            >
+              Voltar ao catálogo
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!product) {
     return (
       <div className="mx-auto max-w-3xl px-4 sm:px-6 py-16 text-center space-y-4">
         <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
           Produto não encontrado
         </h1>
-        <p className="text-sm text-[#8A8A8A]">
-          O artigo que procuras pode não estar publicado ou o endereço não está correto.
-        </p>
+        <p className="text-sm text-[#8A8A8A]">{PUBLIC_MESSAGES.productNotFound}</p>
         <Link
           to="/catalogo"
           className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-bold uppercase text-[#0A0A0A]"

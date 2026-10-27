@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-ad62a015'], (function (workbox) { 'use strict';
+define(['./workbox-13942bd7'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -78,14 +78,13 @@ define(['./workbox-ad62a015'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/index.html",
-    "revision": "0.obkttpqekjg"
+    "revision": "0.qonrvmrfdh"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/],
     denylist: [/^\/api\//, /^\/rest\//, /^\/auth\//, /manifest\.webmanifest$/, /sw\.js$/, /dev-sw\.js$/, /workbox-.*\.js$/, /\.mp4$/, /\.webm$/, /\.pdf$/]
   }));
-  workbox.registerRoute(/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/(rest|auth|functions|graphql|realtime)\/.*/i, new workbox.NetworkOnly(), 'GET');
   workbox.registerRoute(/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/storage\/v1\/object\/public\/.*/i, new workbox.NetworkFirst({
     "cacheName": "bercali-supabase-product-images",
     "networkTimeoutSeconds": 4,

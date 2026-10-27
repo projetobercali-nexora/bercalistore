@@ -11,6 +11,11 @@ import type {
 } from '../types/store';
 import { hasValidationErrors, validateCheckoutForm } from '../utils/checkout';
 import {
+  classifyCatalogError,
+  PUBLIC_MESSAGES,
+  type CatalogErrorKind,
+} from '../utils/publicMessages';
+import {
   applyFeaturedSelection,
   attachRelationsToProducts,
   buildStoreCategories,
@@ -36,6 +41,7 @@ export interface StorefrontCatalogResponse {
   whatsappNumber: string;
   deliveryFeeRules: DeliveryFeeRule[];
   error: string | null;
+  errorKind: CatalogErrorKind;
   accessNotice: string | null;
 }
 
@@ -101,15 +107,26 @@ async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
 
 export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogResponse> {
   const defaultSettings = createDefaultPublicStoreSettings();
+  const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
   if (!supabase || !SUPABASE_CONFIG_STATUS.configured) {
+    if (typeof console !== 'undefined') {
+      console.error(
+        '[Bercali Store · Diagnóstico Catálogo] Cliente público não inicializado. Confirma VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas variáveis de ambiente.'
+      );
+    }
+    const classified = classifyCatalogError({
+      configured: false,
+      isOffline: browserOffline,
+    });
     return {
       products: [],
       categories: [],
       storeSettings: defaultSettings,
       whatsappNumber: defaultSettings.whatsappNumber,
       deliveryFeeRules: defaultSettings.deliveryFeeRules,
-      error: 'A configuração de acesso público à base de dados da loja está incompleta.',
+      error: classified.userMessage,
+      errorKind: classified.kind,
       accessNotice: null,
     };
   }
@@ -131,19 +148,51 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       supabase.from('store_settings').select('setting_key, setting_value'),
     ]);
 
+    if (categoriesRes.error && typeof console !== 'undefined') {
+      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler categories:', {
+        code: categoriesRes.error.code,
+        message: categoriesRes.error.message,
+      });
+    }
+    if (mediaRes.error && typeof console !== 'undefined') {
+      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler product_media:', {
+        code: mediaRes.error.code,
+        message: mediaRes.error.message,
+      });
+    }
+    if (settingsRes.error && typeof console !== 'undefined') {
+      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler store_settings:', {
+        code: settingsRes.error.code,
+        message: settingsRes.error.message,
+      });
+    }
+
     const rawSettings = settingsRes.error
       ? []
       : ((settingsRes.data ?? []) as unknown as SupabaseStoreSettingRow[]);
     const storeSettings = extractPublicStoreSettings(rawSettings, SUPABASE_PUBLIC_URL);
 
     if (productsRes.error) {
+      if (typeof console !== 'undefined') {
+        console.error('[Bercali Store · Diagnóstico Catálogo] Erro ao consultar products:', {
+          code: productsRes.error.code,
+          message: productsRes.error.message,
+          details: productsRes.error.details,
+        });
+      }
+      const classified = classifyCatalogError({
+        configured: true,
+        isOffline: browserOffline,
+        postgrestError: productsRes.error,
+      });
       return {
         products: [],
         categories: [],
         storeSettings,
         whatsappNumber: storeSettings.whatsappNumber,
         deliveryFeeRules: storeSettings.deliveryFeeRules,
-        error: 'Não foi possível carregar o catálogo de produtos neste momento.',
+        error: classified.userMessage,
+        errorKind: classified.kind,
         accessNotice: null,
       };
     }
@@ -181,7 +230,6 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
     const finalProducts = applyFeaturedSelection(productsWithMedia);
     const finalCategories = buildStoreCategories(rawCategories, finalProducts);
 
-    let accessNotice: string | null = null;
     if (rawProducts.length === 0) {
       const storageProbe = await supabase.storage
         .from(PRODUCT_MEDIA_BUCKET)
@@ -189,13 +237,15 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       const hasUploadedProductAssets =
         !storageProbe.error && Array.isArray(storageProbe.data) && storageProbe.data.length > 0;
 
-      if (hasUploadedProductAssets) {
-        accessNotice =
-          'A loja está ligada ao projeto Supabase correto, mas a consulta pública (papel anon) recebeu 0 produtos da tabela products. Aplica as políticas RLS de leitura pública (SELECT para anon) no SQL Editor do Supabase para tornar visíveis os produtos publicados no Painel Administrativo.';
+      if (hasUploadedProductAssets && typeof console !== 'undefined') {
+        console.warn(
+          '[Bercali Store · Diagnóstico Catálogo] Consulta pública devolveu 0 linhas em products apesar de existirem ficheiros em product-media. Verifica o estado de publicação dos produtos ou políticas SELECT.'
+        );
       }
-    } else if (finalProducts.length === 0 && rawProducts.length > 0) {
-      accessNotice =
-        'Os produtos encontrados na base de dados estão atualmente marcados como rascunho, inativos ou arquivados no Painel Administrativo.';
+    } else if (finalProducts.length === 0 && rawProducts.length > 0 && typeof console !== 'undefined') {
+      console.info(
+        '[Bercali Store · Diagnóstico Catálogo] Os registos recebidos de products encontram-se em estado não publicado (rascunho/inativo/arquivado).'
+      );
     }
 
     return {
@@ -205,16 +255,29 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       whatsappNumber: storeSettings.whatsappNumber,
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       error: null,
-      accessNotice,
+      errorKind: 'none',
+      accessNotice: null,
     };
-  } catch {
+  } catch (thrownError) {
+    if (typeof console !== 'undefined') {
+      console.error(
+        '[Bercali Store · Diagnóstico Catálogo] Falha de ligação ao carregar catálogo:',
+        thrownError
+      );
+    }
+    const classified = classifyCatalogError({
+      configured: true,
+      isOffline: typeof navigator !== 'undefined' && navigator.onLine === false,
+      thrownError,
+    });
     return {
       products: [],
       categories: [],
       storeSettings: defaultSettings,
       whatsappNumber: defaultSettings.whatsappNumber,
       deliveryFeeRules: defaultSettings.deliveryFeeRules,
-      error: 'Ocorreu uma falha de ligação ao consultar os produtos da loja.',
+      error: classified.userMessage,
+      errorKind: classified.kind,
       accessNotice: null,
     };
   }
@@ -274,11 +337,16 @@ export async function submitOrderToSupabase(
   }
 
   if (!supabase || !SUPABASE_CONFIG_STATUS.configured) {
+    if (typeof console !== 'undefined') {
+      console.error(
+        '[Bercali Store · Diagnóstico Encomenda] Cliente público não inicializado ao submeter encomenda.'
+      );
+    }
     return {
       ok: false,
       status: 'unconfigured',
       orderNumber,
-      errorMessage: 'A ligação à base de dados não está configurada neste ambiente.',
+      errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
     };
   }
 
@@ -310,12 +378,18 @@ export async function submitOrderToSupabase(
       ]);
 
       if (liveProductsRes.error) {
+        if (typeof console !== 'undefined') {
+          console.error(
+            '[Bercali Store · Diagnóstico Encomenda] Falha ao revalidar produtos:',
+            liveProductsRes.error
+          );
+        }
         return {
           ok: false,
           status: 'error',
           orderNumber,
           errorCode: liveProductsRes.error.code,
-          errorMessage: 'Não foi possível validar os preços e stock atuais dos produtos.',
+          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
         };
       }
 
@@ -433,21 +507,29 @@ export async function submitOrderToSupabase(
           };
         }
         if (rpcRes.error.code === '42501') {
+          if (typeof console !== 'undefined') {
+            console.error(
+              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente na função create_storefront_order:',
+              rpcRes.error
+            );
+          }
           return {
             ok: false,
             status: 'rls_blocked',
             orderNumber,
             errorCode: '42501',
-            errorMessage:
-              'Permissão de registo pendente na base de dados (função RPC / política RLS para encomendas públicas).',
+            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
           };
+        }
+        if (typeof console !== 'undefined') {
+          console.error('[Bercali Store · Diagnóstico Encomenda] Erro RPC:', rpcRes.error);
         }
         return {
           ok: false,
           status: 'error',
           orderNumber,
           errorCode: rpcRes.error.code,
-          errorMessage: 'Não foi possível registar automaticamente a encomenda no sistema.',
+          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
         };
       }
 
@@ -467,24 +549,35 @@ export async function submitOrderToSupabase(
 
       if (customerInsert.error) {
         if (customerInsert.error.code === '42501') {
+          if (typeof console !== 'undefined') {
+            console.error(
+              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em customers:',
+              customerInsert.error
+            );
+          }
           return {
             ok: false,
             status: 'rls_blocked',
             orderNumber,
             errorCode: '42501',
-            errorMessage:
-              'Permissão de registo pendente na base de dados (aplica o script SQL da função create_storefront_order no Supabase).',
+            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
           };
         }
         if (customerInsert.error.code === '23505') {
           effectiveCustomerId = null;
         } else {
+          if (typeof console !== 'undefined') {
+            console.error(
+              '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em customers:',
+              customerInsert.error
+            );
+          }
           return {
             ok: false,
             status: 'error',
             orderNumber,
             errorCode: customerInsert.error.code,
-            errorMessage: 'Não foi possível guardar os dados de cliente no sistema.',
+            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
           };
         }
       }
@@ -512,13 +605,18 @@ export async function submitOrderToSupabase(
 
       if (orderInsert.error) {
         if (orderInsert.error.code === '42501') {
+          if (typeof console !== 'undefined') {
+            console.error(
+              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em orders:',
+              orderInsert.error
+            );
+          }
           return {
             ok: false,
             status: 'rls_blocked',
             orderNumber,
             errorCode: '42501',
-            errorMessage:
-              'Permissão de registo pendente na tabela de encomendas (aplica o script SQL de encomendas públicas no Supabase).',
+            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
           };
         }
         if (orderInsert.error.code === '23505') {
@@ -532,12 +630,18 @@ export async function submitOrderToSupabase(
           completedOrderSubmissions.set(idempotencyKey, dedupResult);
           return dedupResult;
         }
+        if (typeof console !== 'undefined') {
+          console.error(
+            '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em orders:',
+            orderInsert.error
+          );
+        }
         return {
           ok: false,
           status: 'error',
           orderNumber,
           errorCode: orderInsert.error.code,
-          errorMessage: 'Não foi possível criar o registo da encomenda no sistema.',
+          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
         };
       }
 
@@ -545,21 +649,32 @@ export async function submitOrderToSupabase(
 
       if (itemsInsert.error) {
         if (itemsInsert.error.code === '42501') {
+          if (typeof console !== 'undefined') {
+            console.error(
+              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em order_items:',
+              itemsInsert.error
+            );
+          }
           return {
             ok: false,
             status: 'rls_blocked',
             orderNumber,
             errorCode: '42501',
-            errorMessage:
-              'Permissão de registo pendente na tabela de itens da encomenda (política RLS).',
+            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
           };
+        }
+        if (typeof console !== 'undefined') {
+          console.error(
+            '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em order_items:',
+            itemsInsert.error
+          );
         }
         return {
           ok: false,
           status: 'error',
           orderNumber,
           errorCode: itemsInsert.error.code,
-          errorMessage: 'Não foi possível guardar os artigos da encomenda no sistema.',
+          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
         };
       }
 
@@ -572,12 +687,18 @@ export async function submitOrderToSupabase(
       };
       completedOrderSubmissions.set(idempotencyKey, savedResult);
       return savedResult;
-    } catch {
+    } catch (thrownError) {
+      if (typeof console !== 'undefined') {
+        console.error(
+          '[Bercali Store · Diagnóstico Encomenda] Falha de rede ao submeter encomenda:',
+          thrownError
+        );
+      }
       return {
         ok: false,
         status: 'error',
         orderNumber,
-        errorMessage: 'Ocorreu uma falha de rede ao registar a encomenda.',
+        errorMessage: PUBLIC_MESSAGES.orderRegistrationNetworkError,
       };
     } finally {
       inFlightOrderSubmissions.delete(idempotencyKey);

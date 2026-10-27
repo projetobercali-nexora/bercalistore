@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, FolderOpen, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ChevronRight, FolderOpen, RefreshCw } from 'lucide-react';
 import { ProductGrid } from '../components/ProductGrid';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
 import { useCatalog } from '../context/CatalogContext';
 import { filterProducts } from '../utils/catalog';
+import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 export const CategoriesPage: React.FC = () => {
   const { categorySlug } = useParams<{ categorySlug?: string }>();
-  const { products, categories, loading, error, accessNotice, refreshCatalog } = useCatalog();
+  const { products, categories, loading, error, refreshCatalog } = useCatalog();
 
   const activeCategory = useMemo(
     () => (categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined),
@@ -40,6 +41,8 @@ export const CategoriesPage: React.FC = () => {
               ? 'A carregar categoria...'
               : activeCategory
               ? activeCategory.name
+              : error
+              ? 'Categorias'
               : 'Categoria não encontrada'}
           </h1>
           {!loading && activeCategory && (
@@ -55,9 +58,11 @@ export const CategoriesPage: React.FC = () => {
         <ProductGrid
           products={categoryProducts}
           loading={loading}
+          error={error}
           emptyTitle="Sem produtos nesta categoria"
-          emptyDescription="Consulta as outras categorias disponíveis no catálogo da Bercali Store."
+          emptyDescription={PUBLIC_MESSAGES.emptyCategory}
           onRefresh={() => void refreshCatalog()}
+          onRetry={() => void refreshCatalog()}
         />
       </div>
     );
@@ -75,12 +80,20 @@ export const CategoriesPage: React.FC = () => {
         </p>
       </div>
 
-      {error && (
+      {error && !loading && categories.length > 0 && (
         <div
           role="alert"
-          className="rounded-xl bg-[#1A1A1A] border border-[#FFC400]/40 px-4 py-3 text-xs text-[#8A8A8A]"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-white/15 px-4 py-3 text-xs text-white/90"
         >
-          <strong className="text-[#FFC400]">Aviso:</strong> {error}
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void refreshCatalog()}
+            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#0A0A0A] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer shrink-0"
+          >
+            <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <span>Tentar novamente</span>
+          </button>
         </div>
       )}
 
@@ -105,15 +118,33 @@ export const CategoriesPage: React.FC = () => {
             </div>
           ))}
         </div>
+      ) : error && categories.length === 0 ? (
+        <div
+          role="alert"
+          className="rounded-xl bg-[#1A1A1A] border border-white/15 p-8 sm:p-12 text-center"
+        >
+          <AlertCircle className="mx-auto h-10 w-10 text-[#FFC400]" aria-hidden="true" />
+          <h2 className="mt-4 font-display text-lg font-bold text-white">
+            Não foi possível carregar as categorias
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A] leading-relaxed">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refreshCatalog()}
+            className="mt-5 inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-2.5 font-display text-xs font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer"
+          >
+            <RefreshCw className="h-4 w-4 shrink-0" />
+            <span>Tentar novamente</span>
+          </button>
+        </div>
       ) : categories.length === 0 ? (
         <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-8 sm:p-12 text-center">
           <FolderOpen className="mx-auto h-10 w-10 text-[#FF8A00]" aria-hidden="true" />
           <h2 className="mt-4 font-display text-lg font-bold text-white">
-            Nenhuma categoria ativa visível
+            Sem categorias disponíveis de momento
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A]">
-            {accessNotice ??
-              'As categorias ativas criadas no Painel Administrativo aparecerão aqui automaticamente.'}
+          <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A] leading-relaxed">
+            {PUBLIC_MESSAGES.emptyCategoriesList}
           </p>
           <button
             type="button"

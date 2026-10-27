@@ -26,6 +26,7 @@ import {
   isValidWhatsAppNumber,
   validateCheckoutForm,
 } from '../utils/checkout';
+import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 import { generateOrderNumber } from '../utils/supabaseMapper';
 
 interface WhatsAppCheckoutButtonProps {
@@ -125,9 +126,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
     }
 
     setPersistenceStatus(res.status);
-    setPersistenceMessage(
-      res.errorMessage ?? 'Não foi possível guardar automaticamente o pedido na base de dados.'
-    );
+    setPersistenceMessage(res.errorMessage ?? PUBLIC_MESSAGES.orderRegistrationTemporaryError);
 
     if (res.status === 'store_closed' || res.status === 'stock_conflict') {
       void refreshCatalog({ silent: true });
@@ -347,9 +346,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
 
       {!numberConfigured && (
         <p className="rounded-lg bg-[#0A0A0A] border border-[#FFC400]/30 p-3 text-xs text-[#8A8A8A] leading-relaxed">
-          <strong className="text-[#FFC400]">Nota de contacto:</strong> Assim que o número oficial
-          do WhatsApp for definido nas Definições da Loja no Painel Administrativo, este botão
-          abrirá diretamente a conversa oficial.
+          {PUBLIC_MESSAGES.whatsappUnavailableNotice}
         </p>
       )}
 

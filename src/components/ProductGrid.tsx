@@ -1,24 +1,28 @@
 import React from 'react';
-import { PackageSearch, RefreshCw } from 'lucide-react';
+import { AlertCircle, PackageSearch, RefreshCw } from 'lucide-react';
 import type { Product } from '../types/store';
 import { ProductCard } from './ProductCard';
 
 interface ProductGridProps {
   products: readonly Product[];
   loading?: boolean;
+  error?: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
   onResetFilters?: () => void;
   onRefresh?: () => void;
+  onRetry?: () => void;
 }
 
 export const ProductGrid: React.FC<ProductGridProps> = ({
   products,
   loading = false,
+  error = null,
   emptyTitle = 'Nenhum produto encontrado',
-  emptyDescription = 'Não encontrámos artigos para esta pesquisa ou filtro. Tenta usar outras palavras ou limpa os filtros.',
+  emptyDescription = 'Não encontrámos produtos para esta pesquisa. Tenta usar outras palavras ou limpa os filtros.',
   onResetFilters,
   onRefresh,
+  onRetry,
 }) => {
   if (loading) {
     return (
@@ -48,12 +52,42 @@ export const ProductGrid: React.FC<ProductGridProps> = ({
     );
   }
 
+  if (error && products.length === 0) {
+    const retryAction = onRetry ?? onRefresh;
+    return (
+      <div
+        role="alert"
+        className="rounded-xl bg-[#1A1A1A] border border-white/15 p-8 sm:p-12 text-center"
+      >
+        <AlertCircle className="mx-auto h-10 w-10 text-[#FFC400]" aria-hidden="true" />
+        <h3 className="mt-4 font-display text-lg font-bold text-white">
+          Não foi possível carregar os produtos
+        </h3>
+        <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A] leading-relaxed">{error}</p>
+        {retryAction && (
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={retryAction}
+              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-2.5 font-display text-xs font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer"
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span>Tentar novamente</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (products.length === 0) {
     return (
       <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-8 sm:p-12 text-center">
         <PackageSearch className="mx-auto h-10 w-10 text-[#FF8A00]" aria-hidden="true" />
         <h3 className="mt-4 font-display text-lg font-bold text-white">{emptyTitle}</h3>
-        <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A]">{emptyDescription}</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-[#8A8A8A] leading-relaxed">
+          {emptyDescription}
+        </p>
         {(onResetFilters || onRefresh) && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
             {onResetFilters && (

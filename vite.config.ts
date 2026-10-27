@@ -6,6 +6,7 @@ import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [
       react(),
       tailwindcss(),
@@ -68,12 +69,6 @@ export default defineConfig(() => {
             /\.pdf$/,
           ],
           runtimeCaching: [
-            {
-              // Garante que produtos, categorias, estado da loja, autenticação e encomendas do Supabase
-              // NUNCA são intercetados ou guardados em cache pelo Service Worker.
-              urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/(rest|auth|functions|graphql|realtime)\/.*/i,
-              handler: 'NetworkOnly',
-            },
             {
               // Imagens públicas de produtos no Supabase Storage: prioriza sempre a rede para refletir
               // alterações imediatas do Painel Administrativo, com fallback em caso de falha momentânea.
