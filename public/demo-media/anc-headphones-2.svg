@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#121212" />
+  <ellipse cx="400" cy="285" rx="145" ry="110" fill="#1B1B1B" stroke="#333333" stroke-width="3" />
+  <path d="M 335 285 Q 400 230 465 285" fill="none" stroke="#FFC400" stroke-width="3" stroke-linecap="round" />
+  <circle cx="360" cy="310" r="28" fill="#141414" stroke="#FF8A00" stroke-width="2" />
+  <circle cx="440" cy="310" r="28" fill="#141414" stroke="#FF8A00" stroke-width="2" />
+  <text x="400" y="518" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="15" font-weight="700" letter-spacing="1">FORMATO DOBRÁVEL &amp; ESTOJO</text>
+  <text x="400" y="546" text-anchor="middle" fill="#8A8A8A" font-family="Poppins, sans-serif" font-size="12" letter-spacing="1.5">IMAGEM DE DEMONSTRAÇÃO · SUBSTITUIR POR FOTO REAL</text>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#FF8A00" stop-opacity="0.16" />
+      <stop offset="100%" stop-color="#111111" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF8A00" />
+      <stop offset="100%" stop-color="#FFC400" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="#121212" />
+  <rect width="800" height="600" fill="url(#glow)" />
+  <!-- Powerbank Body Front -->
+  <rect x="275" y="105" width="250" height="350" rx="28" fill="#242424" stroke="#525252" stroke-width="3" />
+  <rect x="297" y="130" width="206" height="255" rx="14" fill="#161616" stroke="#FF8A00" stroke-opacity="0.7" stroke-width="2" />
+  <!-- Solar Grid Lines -->
+  <line x1="297" y1="194" x2="503" y2="194" stroke="#3D3D3D" stroke-width="1.5" />
+  <line x1="297" y1="258" x2="503" y2="258" stroke="#3D3D3D" stroke-width="1.5" />
+  <line x1="297" y1="322" x2="503" y2="322" stroke="#3D3D3D" stroke-width="1.5" />
+  <line x1="365" y1="130" x2="365" y2="385" stroke="#3D3D3D" stroke-width="1.5" />
+  <line x1="435" y1="130" x2="435" y2="385" stroke="#3D3D3D" stroke-width="1.5" />
+  <!-- Charge LED Indicators -->
+  <circle cx="364" cy="418" r="5" fill="#FF8A00" />
+  <circle cx="388" cy="418" r="5" fill="#FF8A00" />
+  <circle cx="412" cy="418" r="5" fill="#FFC400" />
+  <circle cx="436" cy="418" r="5" fill="#333333" />
+  <!-- Discreet Demo Identification -->
+  <text x="400" y="518" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="15" font-weight="700" letter-spacing="1">VISTA FRONTAL · PAINEL SOLAR</text>
+  <text x="400" y="546" text-anchor="middle" fill="#8A8A8A" font-family="Poppins, sans-serif" font-size="12" letter-spacing="1.5">IMAGEM DE DEMONSTRAÇÃO · SUBSTITUIR POR FOTO REAL</text>
+</svg>

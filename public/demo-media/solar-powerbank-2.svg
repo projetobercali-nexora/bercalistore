@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#121212" />
+  <!-- Side / Ports Detail -->
+  <rect x="210" y="215" width="380" height="120" rx="24" fill="#1C1C1C" stroke="#333333" stroke-width="3" />
+  <!-- USB-A Port 1 -->
+  <rect x="265" y="260" width="58" height="24" rx="4" fill="#0A0A0A" stroke="#FF8A00" stroke-width="2" />
+  <rect x="275" y="268" width="38" height="6" fill="#FF8A00" />
+  <!-- USB-C PD Port -->
+  <rect x="371" y="263" width="58" height="18" rx="9" fill="#0A0A0A" stroke="#FFC400" stroke-width="2" />
+  <!-- USB-A Port 2 -->
+  <rect x="477" y="260" width="58" height="24" rx="4" fill="#0A0A0A" stroke="#FF8A00" stroke-width="2" />
+  <rect x="487" y="268" width="38" height="6" fill="#FF8A00" />
+  <text x="294" y="312" text-anchor="middle" fill="#8A8A8A" font-family="Montserrat, sans-serif" font-size="11" font-weight="700">USB-A 1</text>
+  <text x="400" y="312" text-anchor="middle" fill="#FFC400" font-family="Montserrat, sans-serif" font-size="11" font-weight="700">USB-C IN/OUT</text>
+  <text x="506" y="312" text-anchor="middle" fill="#8A8A8A" font-family="Montserrat, sans-serif" font-size="11" font-weight="700">USB-A 2</text>
+  <text x="400" y="518" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="15" font-weight="700" letter-spacing="1">DETALHE DAS PORTAS USB-C &amp; USB-A</text>
+  <text x="400" y="546" text-anchor="middle" fill="#8A8A8A" font-family="Poppins, sans-serif" font-size="12" letter-spacing="1.5">IMAGEM DE DEMONSTRAÇÃO · SUBSTITUIR POR FOTO REAL</text>
+</svg>

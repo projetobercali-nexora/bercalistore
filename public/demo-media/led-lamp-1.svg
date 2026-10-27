@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="beam" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFC400" stop-opacity="0.32" />
+      <stop offset="100%" stop-color="#FFC400" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="#121212" />
+  <!-- Light Cone -->
+  <polygon points="330,165 510,165 560,420 280,420" fill="url(#beam)" />
+  <!-- Lamp Stand & Head -->
+  <rect x="290" y="420" width="180" height="22" rx="11" fill="#262626" stroke="#FF8A00" stroke-width="2" />
+  <line x1="340" y1="420" x2="315" y2="155" stroke="#3A3A3A" stroke-width="12" stroke-linecap="round" />
+  <rect x="305" y="145" width="215" height="18" rx="9" fill="#262626" stroke="#FFC400" stroke-width="2" />
+  <text x="400" y="518" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="15" font-weight="700" letter-spacing="1">CANDEEIRO LED RECARREGÁVEL USB-C</text>
+  <text x="400" y="546" text-anchor="middle" fill="#8A8A8A" font-family="Poppins, sans-serif" font-size="12" letter-spacing="1.5">IMAGEM DE DEMONSTRAÇÃO · SUBSTITUIR POR FOTO REAL</text>
+</svg>

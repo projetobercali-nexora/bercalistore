@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="800" height="600" fill="#121212" />
+  <rect x="200" y="175" width="400" height="210" rx="22" fill="#1C1C1C" stroke="#333333" stroke-width="3" />
+  <rect x="235" y="210" width="330" height="55" rx="10" fill="#131313" stroke="#282828" stroke-width="1.5" />
+  <circle cx="270" cy="238" r="6" fill="#22C55E" />
+  <circle cx="310" cy="238" r="6" fill="#FF8A00" />
+  <circle cx="350" cy="238" r="6" fill="#FFC400" />
+  <text x="530" y="243" text-anchor="end" fill="#FFC400" font-family="Montserrat, sans-serif" font-size="14" font-weight="700">5V / 9V / 12V DC</text>
+  <rect x="235" y="300" width="90" height="36" rx="8" fill="#151515" stroke="#FF8A00" stroke-width="1.5" />
+  <text x="280" y="323" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="12" font-weight="700">POE / LAN</text>
+  <rect x="345" y="300" width="90" height="36" rx="8" fill="#151515" stroke="#333333" stroke-width="1.5" />
+  <text x="390" y="323" text-anchor="middle" fill="#8A8A8A" font-family="Montserrat, sans-serif" font-size="12" font-weight="700">USB 5V</text>
+  <text x="400" y="518" text-anchor="middle" fill="#FFFFFF" font-family="Montserrat, sans-serif" font-size="15" font-weight="700" letter-spacing="1">MINI UPS PARA ROUTER WI-FI</text>
+  <text x="400" y="546" text-anchor="middle" fill="#8A8A8A" font-family="Poppins, sans-serif" font-size="12" letter-spacing="1.5">IMAGEM DE DEMONSTRAÇÃO · SUBSTITUIR POR FOTO REAL</text>
+</svg>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sem ligação — Bercali Store</title>
+    <meta name="theme-color" content="#0A0A0A" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100dvh;
+        background: #0A0A0A;
+        color: #FFFFFF;
+        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        max-width: 440px;
+        width: 100%;
+        background: #1A1A1A;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .logo-wrap {
+        padding: 12px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: center;
+      }
+      .logo-wrap img {
+        width: 120px;
+        height: 120px;
+        object-fit: contain;
+      }
+      h1 {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 22px;
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+      p {
+        color: #8A8A8A;
+        font-size: 15px;
+        line-height: 1.55;
+        margin-bottom: 24px;
+      }
+      a, button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 48px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #FF8A00 0%, #FFC400 100%);
+        color: #0A0A0A;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        text-transform: uppercase;
+        text-decoration: none;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="logo-wrap">
+        <img src="/assets/aistudio/file_00000000d4ac8243a4a41ff6e2cc5b63_b707e5fc.png" alt="Bercali Store — O futuro das compras começa aqui." />
+      </div>
+      <h1>Estás sem ligação à internet</h1>
+      <p>
+        Podes continuar a consultar as páginas já guardadas no teu dispositivo. Para enviar uma encomenda pelo WhatsApp, restabelece primeiro a ligação à internet.
+      </p>
+      <button type="button" onclick="window.location.href='/'">Tentar novamente</button>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Bercali Store",
+  "description": "Loja virtual da Bercali Store em Angola. O futuro das compras começa aqui.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

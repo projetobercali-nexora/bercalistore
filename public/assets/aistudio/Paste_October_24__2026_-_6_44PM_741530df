@@ -1,0 +1,801 @@
+PROMPT MASTER — CRIAÇÃO DA LOJA VIRTUAL BERCALI STORE
+
+1. PAPEL E MISSÃO
+
+Atua como uma equipa sénior de desenvolvimento de software, composta por especialistas em UI/UX, React, TypeScript, design responsivo, Progressive Web Apps (PWA), comércio eletrónico, acessibilidade, desempenho web e segurança frontend.
+
+A tua missão é CONSTRUIR uma loja virtual funcional, moderna, profissional e fácil de utilizar para a marca BERCALI STORE, seguindo rigorosamente o logotipo e o manual de marca anexados a este projeto.
+
+Não quero apenas uma demonstração visual, uma imagem de uma loja ou um protótipo estático. Quero uma aplicação web real, com páginas navegáveis, componentes funcionais, catálogo de produtos, galeria de imagens e vídeos, carrinho de compras, formulário de encomenda e integração com WhatsApp.
+
+Nome da marca: Bercali Store
+Slogan oficial: O futuro das compras começa aqui.
+Mercado principal: Angola.
+Moeda: Kwanza angolano (Kz).
+Canal de finalização das encomendas: WhatsApp.
+Arquitetura inicial: Frontend sem base de dados e sem backend próprio.
+Prioridade de desenvolvimento: 100% mobile-first.
+
+Segue todas as instruções abaixo. Não ignores requisitos para simplificar o trabalho.
+
+---
+
+2. REGRA ABSOLUTA: NÃO ALTERAR O LOGOTIPO
+
+O logotipo original da Bercali Store é um elemento protegido da identidade visual da marca.
+
+Utiliza o ficheiro de logotipo que foi fornecido como referência. Se estiver disponível como ficheiro anexado, importa-o diretamente para o projeto e utiliza-o como um recurso de imagem estático.
+
+É expressamente proibido:
+
+- Redesenhar ou recriar o logotipo através de inteligência artificial.
+- Substituir o logotipo original por texto, ícones, emojis ou versões aproximadas.
+- Alterar as cores originais, incluindo o laranja, o branco e os restantes elementos.
+- Alterar o formato, a proporção, a tipografia, o espaçamento ou a posição dos elementos internos.
+- Esticar, comprimir, inclinar, rodar ou distorcer a imagem.
+- Adicionar sombras, contornos, efeitos 3D, brilhos ou filtros ao logotipo.
+- Remover elementos, incluindo o símbolo B, a sacola, as linhas de velocidade, o nome Bercali, a palavra STORE ou o slogan.
+- Recortar partes da imagem para criar uma nova versão.
+- Utilizar o logotipo como fundo de uma secção da página.
+- Gerar uma nova versão do logotipo para o favicon ou para o ícone PWA.
+
+Regras de utilização:
+
+1. Preserva integralmente o ficheiro original.
+2. Apresenta o logotipo com "object-fit: contain" e proporções naturais.
+3. Utiliza o tamanho responsivo sem deformar a imagem.
+4. Mantém espaço livre à volta do logotipo.
+5. Não apliques filtros CSS, máscaras, opacidade reduzida ou modos de mistura à imagem.
+6. Não alteres o conteúdo interno do ficheiro.
+7. Se o fundo original não for adequado para uma determinada secção, altera o fundo da secção, não o logotipo.
+8. Se o logotipo não estiver acessível no projeto, solicita o ficheiro original. Não inventes uma substituição.
+9. Para o ícone PWA, utiliza o ficheiro original apenas se tiver dimensões e formato adequados. Caso contrário, solicita uma versão oficial do símbolo isolado. Não inventes um novo símbolo.
+
+O logotipo deve permanecer visualmente idêntico ao ficheiro fornecido em todos os dispositivos.
+
+---
+
+3. IDENTIDADE VISUAL OFICIAL
+
+Segue o manual de marca anexado.
+
+Paleta de cores
+
+- Preto profundo: "#0A0A0A"
+- Laranja Bercali: "#FF8A00"
+- Amarelo âmbar: "#FFC400"
+- Branco: "#FFFFFF"
+- Cinza carvão: "#1A1A1A"
+- Cinza médio: "#8A8A8A"
+- Cinza claro: "#F4F4F4"
+- Verde para estados positivos: "#22C55E"
+- Vermelho para erros ou indisponibilidade: "#EF4444"
+
+Utiliza o preto e os cinzas escuros como base visual, o branco para garantir legibilidade e o laranja e âmbar para destacar preços, ações e elementos importantes.
+
+O gradiente laranja-âmbar pode ser utilizado de forma moderada nos botões principais e nas promoções, sem afetar o logotipo.
+
+Tipografia
+
+- Montserrat Bold ou ExtraBold para títulos e destaques.
+- Poppins Regular ou Medium para descrições, menus, formulários e textos corridos.
+- Montserrat Bold para preços e números importantes.
+
+Direção de design
+
+A loja deve transmitir:
+
+- Confiança.
+- Modernidade.
+- Rapidez.
+- Tecnologia.
+- Facilidade de utilização.
+- Profissionalismo.
+- Proximidade com o cliente.
+
+Utiliza cantos arredondados, espaçamentos consistentes, ícones simples, animações discretas e cartões de produtos bem organizados.
+
+Não sobrecarregues a interface com gradientes, efeitos luminosos, animações excessivas ou elementos decorativos desnecessários.
+
+O produto deve ser sempre o protagonista.
+
+---
+
+4. PRIORIDADE ABSOLUTA: EXPERIÊNCIA MOBILE-FIRST
+
+Desenvolve primeiro para telemóveis e só depois adapta a interface a ecrãs maiores.
+
+A maioria dos utilizadores deverá conseguir navegar e comprar utilizando apenas uma mão.
+
+Dispositivos obrigatórios
+
+A aplicação deve adaptar-se corretamente a:
+
+- Android de ecrã pequeno.
+- Android de ecrã grande.
+- iPhone, incluindo dispositivos com notch ou Dynamic Island.
+- Tablets Android.
+- iPad.
+- Portáteis.
+- Computadores de secretária com ecrãs grandes.
+
+Regras de responsividade
+
+1. Utiliza uma abordagem mobile-first com CSS responsivo.
+2. Não permitas scroll horizontal involuntário.
+3. Evita textos cortados, botões sobrepostos ou elementos fora do ecrã.
+4. Utiliza layouts flexíveis, CSS Grid e Flexbox.
+5. Garante imagens responsivas e com proporções adequadas.
+6. Utiliza áreas de toque de, idealmente, 44 a 48 píxeis.
+7. Os formulários devem ter campos grandes e fáceis de preencher.
+8. Os botões principais devem ser facilmente acessíveis com o polegar.
+9. Considera as áreas seguras dos dispositivos iOS através de "env(safe-area-inset-*)".
+10. Evita janelas pop-up que bloqueiem a navegação.
+11. Não utilizes menus de computador comprimidos em ecrãs pequenos.
+12. Não reduzas excessivamente o tamanho dos textos para fazer caber o conteúdo.
+13. Testa o comportamento em larguras de 320, 360, 375, 390, 414, 768, 1024, 1280 e 1440 píxeis.
+14. Utiliza um menu móvel intuitivo, com abertura e fecho funcionais.
+15. Mantém os preços, os botões de compra e as informações importantes legíveis.
+
+Navegação móvel
+
+Cria uma navegação simples, com acesso rápido a:
+
+- Início.
+- Categorias.
+- Pesquisa.
+- Carrinho.
+- WhatsApp.
+
+Podes utilizar uma barra de navegação inferior fixa em dispositivos móveis, desde que não cubra o conteúdo nem os botões das páginas.
+
+O carrinho deve apresentar um indicador com a quantidade de artigos adicionados.
+
+Em tablets e computadores, adapta a navegação a um cabeçalho horizontal mais espaçoso.
+
+---
+
+5. ESTRUTURA DA PÁGINA INICIAL
+
+Cria uma página inicial profissional, organizada e orientada para a conversão.
+
+5.1. Cabeçalho
+
+Inclui:
+
+- Logotipo original da Bercali Store.
+- Barra ou botão de pesquisa.
+- Acesso às categorias.
+- Ícone do carrinho com contador.
+- Acesso ao WhatsApp.
+- Menu responsivo.
+
+No telemóvel, o cabeçalho deve ser compacto e não ocupar demasiado espaço vertical.
+
+5.2. Banner principal
+
+Cria uma área visual de destaque com:
+
+Título:
+O futuro das compras começa aqui.
+
+Subtítulo:
+Descobre os produtos que procuras, com uma experiência de compra simples, rápida e cómoda.
+
+Botão principal:
+EXPLORAR PRODUTOS
+
+O botão deve conduzir à secção de produtos ou ao catálogo.
+
+Utiliza fotografias reais dos produtos disponíveis, quando fornecidas. Não inventes produtos, preços, garantias, avaliações ou certificações.
+
+5.3. Pesquisa
+
+Implementa uma pesquisa funcional que permita encontrar produtos pelo nome, descrição ou categoria.
+
+A pesquisa deve:
+
+- Funcionar enquanto o utilizador escreve.
+- Ignorar diferenças entre maiúsculas e minúsculas.
+- Apresentar um estado vazio quando não existem resultados.
+- Permitir limpar a pesquisa.
+- Ser confortável de utilizar no telemóvel.
+
+5.4. Categorias
+
+Cria categorias dinâmicas baseadas nos produtos existentes.
+
+Exemplos de categorias iniciais, ajustáveis conforme o catálogo real:
+
+- Eletrónica.
+- Energia e acessórios.
+- Casa.
+- Tecnologia.
+- Acessórios.
+- Outros produtos.
+
+Não assumes que todas estas categorias já existem comercialmente. Permite alterá-las facilmente.
+
+5.5. Secções comerciais
+
+Inclui:
+
+- Produtos em destaque.
+- Novidades.
+- Promoções, apenas quando existirem preços promocionais reais.
+- Catálogo completo.
+- Produtos relacionados, quando aplicável.
+
+Não repitas artificialmente o mesmo produto para preencher o ecrã.
+
+5.6. Rodapé
+
+Inclui:
+
+- Logotipo original, se o espaço permitir.
+- Slogan oficial.
+- Links para as principais secções.
+- Contacto WhatsApp configurável.
+- Informações de entrega e pagamento configuráveis.
+- Política de privacidade.
+- Termos de utilização.
+- Aviso de que as encomendas ficam sujeitas à confirmação da loja.
+
+Não inventes moradas, e-mails, redes sociais ou dados empresariais.
+
+---
+
+6. CATÁLOGO E CARTÕES DE PRODUTOS
+
+Cada cartão de produto deve incluir:
+
+- Fotografia principal.
+- Nome do produto.
+- Preço em Kz.
+- Preço anterior, apenas se existir uma promoção real.
+- Estado de disponibilidade.
+- Botão para ver detalhes.
+- Botão para adicionar ao carrinho.
+
+Os cartões devem ser compactos e legíveis em telemóveis.
+
+Apresenta duas colunas de produtos em muitos ecrãs móveis, desde que as imagens, os nomes, os preços e os botões continuem legíveis. Utiliza uma coluna em ecrãs muito estreitos ou quando o conteúdo exigir mais espaço.
+
+Em tablets e computadores, aumenta gradualmente o número de colunas.
+
+O estado de um produto deve poder ser definido como:
+
+- Disponível.
+- Esgotado.
+- Temporariamente indisponível.
+
+Os produtos esgotados não devem ser apresentados como disponíveis para compra.
+
+---
+
+7. PÁGINA INDIVIDUAL DO PRODUTO
+
+Quando o utilizador selecionar um produto, abre uma página de detalhes ou uma vista de produto equivalente.
+
+Apresenta:
+
+1. Galeria de fotografias.
+2. Vídeo demonstrativo, se disponível.
+3. Nome do produto.
+4. Preço atual.
+5. Preço anterior, se existir.
+6. Descrição.
+7. Características técnicas.
+8. Disponibilidade.
+9. Quantidade pretendida.
+10. Botão “ADICIONAR AO CARRINHO”.
+11. Botão “COMPRAR AGORA”.
+12. Produtos relacionados, se existirem.
+
+Galeria multimédia
+
+Permite ao utilizador:
+
+- Tocar numa imagem para ampliar.
+- Percorrer as fotografias.
+- Reproduzir vídeos.
+- Pausar os vídeos.
+- Voltar facilmente à página anterior.
+
+Os vídeos devem utilizar controlos nativos e não iniciar automaticamente com som.
+
+Não carregues todos os vídeos de uma só vez. Utiliza carregamento diferido e otimização para reduzir o consumo de dados móveis.
+
+Se não houver imagens ou vídeos reais, apresenta um espaço reservado discreto e identificado. Não atribuas imagens genéricas a produtos reais de forma enganadora.
+
+---
+
+8. CARRINHO DE COMPRAS FUNCIONAL
+
+Implementa um carrinho funcional, não apenas visual.
+
+O cliente deve poder:
+
+- Adicionar produtos.
+- Aumentar quantidades.
+- Diminuir quantidades.
+- Remover produtos.
+- Ver os preços individuais.
+- Ver o subtotal.
+- Ver a quantidade total de artigos.
+- Continuar a comprar.
+- Avançar para a finalização.
+
+Impede quantidades inferiores a um e não permitas quantidades superiores ao stock configurado, quando o stock for conhecido.
+
+Persistência sem base de dados
+
+Nesta primeira versão:
+
+- Utiliza "localStorage" para guardar o carrinho no navegador.
+- Restaura o carrinho quando o cliente regressar.
+- Trata erros de leitura ou escrita no armazenamento.
+- Valida os dados recuperados antes de os utilizar.
+- Não guardes palavras-passe, documentos de identificação ou informações sensíveis.
+- Não utilizes uma base de dados.
+- Não cries um backend.
+- Não simules uma base de dados através de serviços externos.
+
+Se o navegador não permitir armazenamento persistente, a aplicação deve continuar a funcionar durante a sessão e informar o utilizador se necessário.
+
+---
+
+9. FINALIZAÇÃO DE ENCOMENDAS PELO WHATSAPP
+
+A finalização deve ser simples, transparente e funcional.
+
+Quando o cliente selecionar “Finalizar pedido”, apresenta um formulário com:
+
+- Nome completo.
+- Número de telefone.
+- Província.
+- Município.
+- Bairro.
+- Endereço ou referência de entrega.
+- Observações opcionais.
+
+Os campos obrigatórios devem ser claramente identificados.
+
+Valida os campos e apresenta mensagens de erro simples em português.
+
+Não solicites informações desnecessárias, documentos de identificação, palavras-passe ou dados bancários.
+
+Resumo da encomenda
+
+Antes de abrir o WhatsApp, apresenta:
+
+- Lista de produtos.
+- Quantidades.
+- Preço unitário.
+- Subtotal.
+- Taxa de entrega, quando conhecida.
+- Total estimado.
+- Dados de entrega fornecidos pelo cliente.
+
+A taxa de entrega deve ser configurável. Se não houver uma regra definida para a zona do cliente, apresenta “A confirmar pela loja” em vez de inventar um valor.
+
+Integração WhatsApp
+
+Cria uma configuração central:
+
+"WHATSAPP_NUMBER = "SUBSTITUIR_PELO_NUMERO_OFICIAL""
+
+O número deve ser configurado no formato internacional exigido pelo link do WhatsApp, apenas com algarismos, incluindo o indicativo do país, sem o sinal "+", espaços ou hífenes.
+
+Cria um link através de "https://wa.me/" e codifica corretamente a mensagem utilizando "encodeURIComponent".
+
+A mensagem deve ser preparada automaticamente num formato semelhante ao seguinte:
+
+Olá, Bercali Store! Quero fazer uma encomenda.
+
+DADOS DO CLIENTE
+Nome: [nome]
+Telefone: [telefone]
+Província: [província]
+Município: [município]
+Bairro: [bairro]
+Endereço/referência: [endereço]
+
+PRODUTOS
+
+1. [nome do produto]
+   Quantidade: [quantidade]
+   Preço unitário: [preço]
+   Subtotal: [subtotal]
+
+RESUMO
+Subtotal dos produtos: [valor]
+Entrega: [valor ou a confirmar]
+Total estimado: [valor ou a confirmar]
+
+Observações: [observações]
+
+Aguardo a confirmação da disponibilidade, do valor final e da entrega. Obrigado!
+
+Regras importantes
+
+- Abre o WhatsApp apenas depois de o cliente tocar no botão de finalização.
+- Mantém o resumo do pedido legível.
+- Se o link não puder ser aberto, apresenta uma alternativa para copiar a mensagem.
+- Não afirmes que o pedido foi enviado ou confirmado antes de o utilizador efetivamente concluir a ação.
+- Não limpes automaticamente o carrinho antes de o utilizador confirmar a conclusão do processo.
+- Não afirmes que existe pagamento online.
+- Não inventes métodos de pagamento, taxas ou prazos.
+- Não cries um sistema falso de pagamento ou de confirmação de encomendas.
+
+O WhatsApp deve ser o canal de comunicação e conclusão do pedido, não uma integração fictícia de pagamentos.
+
+---
+
+10. IMPLEMENTAÇÃO PWA
+
+Transforma a loja numa Progressive Web App instalável, dentro das capacidades reais dos navegadores compatíveis.
+
+Implementa:
+
+- "manifest.webmanifest".
+- Nome da aplicação: Bercali Store.
+- Nome curto: Bercali.
+- "start_url" apropriado.
+- "display: standalone", quando suportado.
+- Cores do tema alinhadas com a marca.
+- Ícones adequados para instalação.
+- Service worker.
+- Estratégia de cache apropriada.
+- Página de fallback offline, quando possível.
+- Deteção do estado de instalação, quando suportada.
+
+O ícone da aplicação deve utilizar um recurso oficial da marca. Não recries nem alteres o logotipo.
+
+Pedido de instalação após 60 a 120 segundos
+
+Pretendo uma mensagem de instalação discreta, apresentada aproximadamente após 90 segundos de navegação, sem bloquear a experiência do cliente.
+
+Implementa o seguinte comportamento:
+
+1. Mede o tempo de utilização da loja durante a sessão.
+2. Só apresenta a mensagem após o período definido.
+3. Só a apresenta quando o navegador e a plataforma permitem esse tipo de convite.
+4. Não apresenta o convite se a aplicação já estiver instalada.
+5. Não apresenta o convite durante o preenchimento do formulário ou a finalização de uma encomenda.
+6. Permite fechar a mensagem facilmente.
+7. Se o utilizador dispensar a mensagem, respeita essa escolha e não volta a incomodar repetidamente.
+8. Se o utilizador tocar em “Instalar”, utiliza o mecanismo de instalação disponibilizado pelo navegador.
+9. Se a instalação automática não estiver disponível, apresenta instruções simples e específicas para a plataforma.
+10. Não exige a instalação para navegar, consultar produtos ou comprar.
+11. Não simula uma instalação que não ocorreu.
+
+Compatibilidade: o comportamento de instalação varia entre Android, Chrome, Safari e iOS. No iPhone e no iPad, quando necessário, explica ao utilizador como adicionar a loja ao ecrã principal através das opções de partilha do Safari.
+
+Funcionamento offline
+
+O PWA deve, sempre que tecnicamente possível:
+
+- Abrir a estrutura básica da loja sem ligação.
+- Apresentar uma página offline clara.
+- Permitir consultar recursos previamente guardados, quando disponíveis.
+- Evitar guardar dados pessoais desnecessários na cache.
+- Não prometer que os pedidos WhatsApp funcionam sem internet.
+
+Não utilizes estratégias de cache que mantenham preços, stock ou dados comerciais desatualizados indefinidamente.
+
+---
+
+11. REQUISITO OBRIGATÓRIO: NÃO UTILIZAR BASE DE DADOS
+
+Esta versão é exclusivamente frontend.
+
+Não implementes:
+
+- Supabase.
+- Firebase.
+- MySQL.
+- PostgreSQL.
+- MongoDB.
+- APIs de bases de dados.
+- Servidores próprios.
+- Autenticação real de utilizadores.
+- Painel administrativo que dependa de backend.
+- Integrações de pagamento.
+- Serviços externos de armazenamento de encomendas.
+
+Não cries credenciais, chaves API, variáveis secretas ou ficheiros de configuração que finjam existir.
+
+Como gerir os produtos nesta versão
+
+Cria um ficheiro central, por exemplo:
+
+"src/data/products.ts"
+
+Cada produto deve possuir uma estrutura consistente com campos semelhantes a:
+
+- "id"
+- "name"
+- "slug"
+- "description"
+- "category"
+- "price"
+- "oldPrice", opcional
+- "images"
+- "video", opcional
+- "features"
+- "stock"
+- "featured"
+- "available"
+
+Os valores e as imagens devem poder ser editados diretamente nos ficheiros do projeto.
+
+Inclui apenas produtos de demonstração claramente identificados como exemplos. Não apresentes produtos de teste como catálogo comercial real.
+
+Se ainda não existirem fotografias comerciais, utiliza placeholders identificados até serem fornecidas as imagens verdadeiras.
+
+Limitações que devem ser assumidas
+
+Sem base de dados:
+
+- Os produtos não são atualizados automaticamente.
+- Não existe sincronização de stock entre dispositivos.
+- As encomendas não ficam guardadas num servidor.
+- Não existe histórico centralizado de compras.
+- Os dados locais do carrinho podem desaparecer se o utilizador limpar os dados do navegador.
+- O WhatsApp não envia automaticamente as encomendas para um painel administrativo.
+
+Não escondas estas limitações nem simules funcionalidades de backend.
+
+Prepara o código de forma organizada para permitir a integração futura de uma base de dados, mas não a implementes agora.
+
+---
+
+12. ARQUITETURA E QUALIDADE DO CÓDIGO
+
+Utiliza uma arquitetura moderna, organizada e sustentável.
+
+Preferencialmente:
+
+- React.
+- TypeScript.
+- Vite, se adequado ao ambiente.
+- CSS moderno ou uma solução de estilos já suportada pelo projeto.
+- Componentes reutilizáveis.
+- Hooks para lógica de interface.
+- Tipos TypeScript explícitos.
+- Ficheiros de dados centralizados.
+- Separação entre componentes, páginas, dados e utilitários.
+
+Antes de instalar dependências, verifica o que já existe no projeto e evita substituir configurações funcionais sem necessidade.
+
+Componentes sugeridos
+
+- "Header"
+- "MobileNavigation"
+- "SearchBar"
+- "CategoryList"
+- "ProductCard"
+- "ProductGrid"
+- "ProductGallery"
+- "ProductDetails"
+- "CartDrawer" ou "CartPage"
+- "CheckoutForm"
+- "OrderSummary"
+- "WhatsAppCheckoutButton"
+- "InstallPrompt"
+- "OfflineFallback"
+- "Footer"
+
+Estes nomes são orientações. Podes adaptar a estrutura desde que mantenhas o código claro e funcional.
+
+Rotas
+
+Implementa, conforme a arquitetura escolhida:
+
+- Página inicial.
+- Catálogo.
+- Categorias.
+- Detalhes do produto.
+- Carrinho.
+- Finalização da encomenda.
+- Página não encontrada.
+
+Garante que as páginas continuam acessíveis quando o utilizador atualiza o navegador numa rota interna.
+
+Estado e dados
+
+Utiliza um sistema de estado simples e consistente.
+
+Evita duplicação de lógica entre os componentes.
+
+Calcula os subtotais e os totais a partir dos dados dos produtos e das quantidades. Não mantenhas valores derivados desnecessariamente em estados separados.
+
+Valida os dados antes de construir a mensagem WhatsApp.
+
+Não confies exclusivamente nos valores recuperados do "localStorage".
+
+---
+
+13. SEGURANÇA E PRIVACIDADE
+
+Implementa boas práticas de segurança frontend:
+
+- Não incluir segredos no código.
+- Não inserir HTML arbitrário proveniente de dados do utilizador.
+- Escapar ou renderizar os dados através dos mecanismos seguros do React.
+- Validar todos os campos do formulário.
+- Validar os dados recuperados do armazenamento local.
+- Não guardar informações pessoais sensíveis no "localStorage".
+- Não recolher dados desnecessários.
+- Não criar scripts de rastreamento sem necessidade.
+- Não utilizar bibliotecas desconhecidas sem justificação.
+- Não solicitar permissões do dispositivo que não sejam necessárias.
+- Não afirmar que existe proteção de servidor quando não existe backend.
+
+A aplicação deverá funcionar em HTTPS no ambiente publicado. Reconhece que algumas funcionalidades PWA, incluindo service workers e instalação, dependem de um contexto seguro.
+
+---
+
+14. DESEMPENHO E EXPERIÊNCIA DO UTILIZADOR
+
+A loja deve ser rápida, sobretudo em redes móveis lentas.
+
+Implementa:
+
+- Imagens otimizadas.
+- Dimensões explícitas para imagens, evitando saltos de layout.
+- Lazy loading para imagens fora do ecrã.
+- Carregamento diferido de vídeos.
+- Divisão de código quando apropriado.
+- Redução de dependências desnecessárias.
+- Feedback visual ao adicionar produtos ao carrinho.
+- Estados de carregamento quando realmente necessários.
+- Mensagens de erro claras.
+- Estados vazios úteis.
+- Animações discretas e respeitadoras de "prefers-reduced-motion".
+
+Não utilizes animações pesadas que prejudiquem dispositivos Android de baixo desempenho.
+
+Evita que a página inicial descarregue todos os vídeos e todas as imagens em alta resolução imediatamente.
+
+Não sacrifiques a legibilidade em nome da estética.
+
+---
+
+15. ACESSIBILIDADE E USABILIDADE
+
+Garante:
+
+- Contraste suficiente entre texto e fundo.
+- Navegação por teclado.
+- Etiquetas claras nos campos.
+- Botões com nomes acessíveis.
+- Texto alternativo nas imagens relevantes.
+- Foco visível.
+- Mensagens de erro associadas aos campos.
+- Elementos interativos com áreas de toque adequadas.
+- Uso correto de títulos e landmarks HTML.
+- Compatibilidade razoável com leitores de ecrã.
+- Respeito pelas preferências de movimento reduzido.
+
+Utiliza português claro, natural e profissional, adequado ao público angolano.
+
+Apresenta os preços de forma consistente em Kz, utilizando uma formatação monetária apropriada.
+
+---
+
+16. CRITÉRIOS VISUAIS DE ACEITAÇÃO
+
+O resultado final deve parecer uma loja virtual profissional, e não um template genérico.
+
+A interface deve apresentar:
+
+- Identidade visual reconhecível da Bercali Store.
+- Logotipo original preservado.
+- Cabeçalho compacto em telemóveis.
+- Produtos com imagens bem dimensionadas.
+- Preços fáceis de encontrar.
+- Botões de compra visíveis.
+- Carrinho intuitivo.
+- Finalização WhatsApp simples.
+- Menu móvel funcional.
+- Formulários confortáveis.
+- Rodapé organizado.
+- Transições discretas.
+- Layout consistente em todas as páginas.
+
+Não acrescentes secções desnecessárias apenas para tornar a página mais comprida.
+
+Não inventes avaliações de clientes, números de vendas, selos de confiança, prémios ou testemunhos.
+
+Não uses mensagens de falsa escassez, como “últimas unidades”, se essa informação não estiver configurada e confirmada.
+
+Não alteres a identidade visual para seguir tendências de design que entrem em conflito com o manual da marca.
+
+---
+
+17. TESTES OBRIGATÓRIOS ANTES DE CONCLUIR
+
+Antes de considerares o projeto concluído, verifica e corrige:
+
+1. A aplicação inicia sem erros.
+2. Não existem erros de compilação TypeScript.
+3. Não existem imports quebrados.
+4. O logotipo utilizado é o ficheiro original.
+5. Não existem distorções do logotipo em nenhum breakpoint.
+6. A navegação funciona em telemóveis e computadores.
+7. A pesquisa filtra corretamente os produtos.
+8. As categorias funcionam.
+9. As páginas de produto apresentam os dados corretos.
+10. As galerias de imagens funcionam.
+11. Os vídeos podem ser reproduzidos e pausados.
+12. O carrinho permite adicionar, remover e alterar quantidades.
+13. Os totais são calculados corretamente.
+14. O carrinho persiste quando o navegador é atualizado.
+15. O formulário valida os campos obrigatórios.
+16. O WhatsApp recebe uma mensagem corretamente codificada.
+17. O número de WhatsApp pode ser configurado num único local.
+18. O PWA possui um manifesto válido.
+19. O service worker é registado corretamente, quando suportado.
+20. A instalação é tratada de acordo com as capacidades do navegador.
+21. O convite de instalação não aparece constantemente.
+22. Não existe scroll horizontal involuntário.
+23. Os botões não ficam cobertos pela navegação fixa.
+24. Os estados vazios e os erros são tratados.
+25. Não existem serviços de base de dados ou pagamentos implementados.
+26. Não existem dados comerciais fictícios apresentados como reais.
+27. Não existem links internos quebrados.
+28. O projeto está preparado para publicação num alojamento HTTPS.
+
+Testa os fluxos principais com produtos de demonstração e verifica a versão móvel através de simulação e, quando possível, de dispositivos reais.
+
+Não declares um teste como concluído se não tiver sido efetivamente executado.
+
+---
+
+18. INSTRUÇÕES DE EXECUÇÃO NO GOOGLE AI STUDIO
+
+Trabalha diretamente no projeto e cria os ficheiros necessários.
+
+Não respondas apenas com uma explicação de como eu poderia desenvolver a aplicação.
+
+Não entregues somente um wireframe, um plano, um conjunto de imagens ou um exemplo de código isolado.
+
+Gera uma aplicação coerente, com todos os componentes ligados e com as funcionalidades implementadas.
+
+Se já existir código, analisa-o antes de fazer alterações. Preserva o que estiver funcional e modifica apenas o necessário.
+
+Se um requisito depender de um ficheiro ainda não fornecido, como o logotipo original, não inventes o recurso. Utiliza uma referência claramente identificada e indica o ficheiro em falta.
+
+Se uma funcionalidade não puder ser implementada integralmente no ambiente disponível, explica a limitação e oferece uma implementação realista, sem simular sucesso.
+
+Não adiciones uma base de dados, autenticação, pagamentos ou backend sem uma nova autorização explícita.
+
+No final, apresenta:
+
+1. Resumo das funcionalidades implementadas.
+2. Estrutura dos ficheiros principais.
+3. Instruções para executar a aplicação.
+4. Indicação de onde editar os produtos.
+5. Indicação de onde configurar o número WhatsApp.
+6. Instruções para adicionar fotografias e vídeos reais.
+7. Instruções para testar o PWA.
+8. Lista de limitações conhecidas.
+9. Lista dos testes que foram realmente executados e dos que ficaram por executar.
+
+RESULTADO FINAL ESPERADO
+
+Construir a primeira versão funcional da loja virtual Bercali Store: moderna, rápida, segura dentro dos limites de uma aplicação frontend, responsiva e prioritariamente concebida para Android e iPhone, adaptável a tablets e computadores, instalável como PWA quando suportado, com catálogo de produtos, fotografias, vídeos, carrinho persistente no dispositivo e finalização de encomendas pelo WhatsApp.
+
+Tudo deve respeitar rigorosamente o manual de marca.
+
+O logotipo original nunca deve ser recriado, modificado, distorcido ou substituído.
+
+Não utilizar base de dados nesta primeira versão.
+
+Não entregar apenas uma demonstração visual: implementar as funcionalidades reais possíveis nesta arquitetura.
+
+A prioridade máxima é oferecer ao cliente uma experiência simples, intuitiva e rápida, que facilite a descoberta dos produtos e a conclusão da encomenda.
+
+BERCALI STORE — O futuro das compras começa aqui.
