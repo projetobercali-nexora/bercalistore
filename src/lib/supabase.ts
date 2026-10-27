@@ -100,15 +100,30 @@ export interface ResolvedSupabasePublicEnv {
   configured: boolean;
 }
 
-const URL_ENV_CANDIDATES = ['VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL'] as const;
+declare const __BERCALI_SUPABASE_URL__: string | undefined;
+declare const __BERCALI_SUPABASE_PUBLIC_KEY__: string | undefined;
+
+const URL_ENV_CANDIDATES = [
+  'VITE_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'PUBLIC_SUPABASE_URL',
+  'REACT_APP_SUPABASE_URL',
+  'SUPABASE_URL',
+] as const;
 
 const KEY_ENV_CANDIDATES = [
   'VITE_SUPABASE_ANON_KEY',
   'VITE_SUPABASE_PUBLISHABLE_KEY',
   'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'VITE_SUPABASE_KEY',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+  'PUBLIC_SUPABASE_ANON_KEY',
+  'PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'REACT_APP_SUPABASE_ANON_KEY',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
 ] as const;
 
 export function resolveSupabasePublicEnv(
@@ -152,10 +167,39 @@ export function resolveSupabasePublicEnv(
   };
 }
 
-const env =
+const rawMetaEnv =
   (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
 
-const resolvedEnv = resolveSupabasePublicEnv(env);
+// Referências estáticas explícitas garantem substituição direta pelo bundler Vite em produção (Vercel)
+const buildTimeUrlFallback =
+  typeof __BERCALI_SUPABASE_URL__ !== 'undefined' ? __BERCALI_SUPABASE_URL__ : undefined;
+const buildTimeKeyFallback =
+  typeof __BERCALI_SUPABASE_PUBLIC_KEY__ !== 'undefined'
+    ? __BERCALI_SUPABASE_PUBLIC_KEY__
+    : undefined;
+
+const mergedClientEnv: Record<string, string | undefined> = {
+  ...rawMetaEnv,
+  VITE_SUPABASE_URL: import.meta.env?.VITE_SUPABASE_URL ?? rawMetaEnv.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY:
+    import.meta.env?.VITE_SUPABASE_ANON_KEY ?? rawMetaEnv.VITE_SUPABASE_ANON_KEY,
+  VITE_SUPABASE_PUBLISHABLE_KEY:
+    import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? rawMetaEnv.VITE_SUPABASE_PUBLISHABLE_KEY,
+  VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY:
+    import.meta.env?.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
+    rawMetaEnv.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+  NEXT_PUBLIC_SUPABASE_URL:
+    import.meta.env?.NEXT_PUBLIC_SUPABASE_URL ?? rawMetaEnv.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY:
+    import.meta.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? rawMetaEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+    import.meta.env?.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    rawMetaEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL: rawMetaEnv.SUPABASE_URL ?? buildTimeUrlFallback,
+  SUPABASE_ANON_KEY: rawMetaEnv.SUPABASE_ANON_KEY ?? buildTimeKeyFallback,
+};
+
+const resolvedEnv = resolveSupabasePublicEnv(mergedClientEnv);
 
 if (!resolvedEnv.configured && typeof console !== 'undefined') {
   const diagnostics: string[] = [];
@@ -163,12 +207,14 @@ if (!resolvedEnv.configured && typeof console !== 'undefined') {
     diagnostics.push(
       resolvedEnv.urlSource
         ? `Variável ${resolvedEnv.urlSource} tem formato de URL inválido (esperado https://<projeto>.supabase.co).`
-        : 'Variável VITE_SUPABASE_URL não encontrada no ambiente de compilação.'
+        : 'Variável VITE_SUPABASE_URL não encontrada no ambiente de compilação (ex.: Vercel -> Settings -> Environment Variables + Redeploy).'
     );
   }
   if (!resolvedEnv.keyValidation.valid) {
     if (resolvedEnv.keyValidation.reason === 'missing') {
-      diagnostics.push('Variável VITE_SUPABASE_ANON_KEY não encontrada no ambiente de compilação.');
+      diagnostics.push(
+        'Variável VITE_SUPABASE_ANON_KEY não encontrada no ambiente de compilação (ex.: Vercel -> Settings -> Environment Variables + Redeploy).'
+      );
     } else if (resolvedEnv.keyValidation.reason === 'forbidden_secret_key') {
       diagnostics.push(
         `Chave em ${resolvedEnv.keySource ?? 'VITE_SUPABASE_ANON_KEY'} rejeitada por segurança: nunca uses service_role ou sb_secret_ no frontend.`
@@ -196,33 +242,6 @@ export const SUPABASE_CONFIG_STATUS = {
  * Cliente público do Supabase partilhado com o projeto da base de dados do Painel Administrativo.
  * Mantém persistSession: false na loja pública para não criar sessões desnecessárias para visitantes.
  */
-const REQUEST_TIMEOUT_MS = 12000;
-
-const storefrontFetch: typeof fetch = async (input, init) => {
-  const headers = new Headers(init?.headers);
-  const retryCount = Number(headers.get('X-Retry-Count') ?? '0');
-
-  // Permite 1 nova tentativa automática rápida (~1s) em micro-quedas móveis,
-  // evitando que o cliente fique preso mais de 8 segundos num ecrã de carregamento sem rede.
-  if (retryCount > 1) {
-    const fastFailError = new Error('Network request failed');
-    fastFailError.name = 'AbortError';
-    throw fastFailError;
-  }
-
-  if (typeof AbortController === 'undefined' || init?.signal) {
-    return fetch(input, init);
-  }
-
-  const controller = new AbortController();
-  const timer = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    return await fetch(input, { ...init, signal: controller.signal });
-  } finally {
-    globalThis.clearTimeout(timer);
-  }
-};
-
 export const supabase: SupabaseClient | null =
   resolvedEnv.configured && resolvedEnv.url && resolvedEnv.anonKey
     ? createClient(resolvedEnv.url, resolvedEnv.anonKey, {
@@ -230,9 +249,6 @@ export const supabase: SupabaseClient | null =
           persistSession: false,
           autoRefreshToken: false,
           detectSessionInUrl: false,
-        },
-        global: {
-          fetch: storefrontFetch,
         },
       })
     : null;

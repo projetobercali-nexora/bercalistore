@@ -7,6 +7,7 @@ import {
   classifyCatalogError,
   containsTechnicalJargon,
   isLikelyNetworkFailure,
+  resolveCatalogLoadStatus,
 } from './publicMessages';
 import {
   normalizeSupabaseUrl,
@@ -50,11 +51,11 @@ test('containsTechnicalJargon detects forbidden internal terms', () => {
   );
 });
 
-test('classifyCatalogError separates network failures from service/configuration errors without leaking details', () => {
+test('classifyCatalogError and resolveCatalogLoadStatus clearly separate all 4 Passo 4 states without leaking details', () => {
   const unconfigured = classifyCatalogError({
     configured: false,
   });
-  assert.equal(unconfigured.kind, 'unavailable');
+  assert.equal(unconfigured.kind, 'unconfigured');
   assert.equal(unconfigured.userMessage, PUBLIC_MESSAGES.catalogTemporaryError);
   assert.equal(containsTechnicalJargon(unconfigured.userMessage), false);
 
@@ -86,6 +87,32 @@ test('classifyCatalogError separates network failures from service/configuration
 
   assert.equal(isLikelyNetworkFailure('TypeError: NetworkError when attempting to fetch resource.'), true);
   assert.equal(isLikelyNetworkFailure('permission denied for schema public'), false);
+
+  // Passo 4: Distingue claramente consulta com produtos, consulta vazia, erro de ligação/permissões e falta de configuração
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: true, errorKind: 'none', productCount: 0 }),
+    'loading'
+  );
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: false, errorKind: 'none', productCount: 2 }),
+    'loaded_with_products'
+  );
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: false, errorKind: 'none', productCount: 0 }),
+    'loaded_empty'
+  );
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: false, errorKind: 'network', productCount: 0 }),
+    'error_connection_or_permission'
+  );
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: false, errorKind: 'unavailable', productCount: 0 }),
+    'error_connection_or_permission'
+  );
+  assert.equal(
+    resolveCatalogLoadStatus({ loading: false, errorKind: 'unconfigured', productCount: 0 }),
+    'error_unconfigured'
+  );
 });
 
 test('sanitizeEnvValue and normalizeSupabaseUrl handle Vercel copy-paste quotes and trailing slashes', () => {
@@ -124,6 +151,14 @@ test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ 
   assert.equal(vercelIntegrationFallback.configured, true);
   assert.equal(vercelIntegrationFallback.urlSource, 'NEXT_PUBLIC_SUPABASE_URL');
   assert.equal(vercelIntegrationFallback.keySource, 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+
+  const unprefixedVercelFallback = resolveSupabasePublicEnv({
+    SUPABASE_URL: 'https://dyhwbzyiuzrdmiogzwdg.supabase.co',
+    SUPABASE_ANON_KEY: anonJwt,
+  });
+  assert.equal(unprefixedVercelFallback.configured, true);
+  assert.equal(unprefixedVercelFallback.urlSource, 'SUPABASE_URL');
+  assert.equal(unprefixedVercelFallback.keySource, 'SUPABASE_ANON_KEY');
 
   const forbiddenServiceRole = resolveSupabasePublicEnv({
     VITE_SUPABASE_URL: 'https://dyhwbzyiuzrdmiogzwdg.supabase.co',

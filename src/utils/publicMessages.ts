@@ -1,4 +1,28 @@
-export type CatalogErrorKind = 'none' | 'network' | 'unavailable';
+export type CatalogErrorKind = 'none' | 'network' | 'unavailable' | 'unconfigured';
+
+export type CatalogLoadStatus =
+  | 'loading'
+  | 'loaded_with_products'
+  | 'loaded_empty'
+  | 'error_connection_or_permission'
+  | 'error_unconfigured';
+
+export function resolveCatalogLoadStatus(params: {
+  loading: boolean;
+  errorKind: CatalogErrorKind;
+  productCount: number;
+}): CatalogLoadStatus {
+  if (params.loading) {
+    return 'loading';
+  }
+  if (params.errorKind === 'unconfigured') {
+    return 'error_unconfigured';
+  }
+  if (params.errorKind !== 'none') {
+    return 'error_connection_or_permission';
+  }
+  return params.productCount > 0 ? 'loaded_with_products' : 'loaded_empty';
+}
 
 /**
  * Mensagens públicas da loja em português de Angola, claras e profissionais,
@@ -75,7 +99,7 @@ export function classifyCatalogError(input: ClassifyCatalogErrorInput): {
 
   if (!input.configured) {
     return {
-      kind: 'unavailable',
+      kind: 'unconfigured',
       userMessage: PUBLIC_MESSAGES.catalogTemporaryError,
     };
   }

@@ -15,7 +15,11 @@ import type {
   PublicStoreSettings,
   StoreCategory,
 } from '../types/store';
-import type { CatalogErrorKind } from '../utils/publicMessages';
+import {
+  resolveCatalogLoadStatus,
+  type CatalogErrorKind,
+  type CatalogLoadStatus,
+} from '../utils/publicMessages';
 import { createDefaultPublicStoreSettings } from '../utils/supabaseMapper';
 
 interface RefreshCatalogOptions {
@@ -28,6 +32,7 @@ interface CatalogContextValue {
   storeSettings: PublicStoreSettings;
   isStoreActive: boolean;
   loading: boolean;
+  loadStatus: CatalogLoadStatus;
   error: string | null;
   errorKind: CatalogErrorKind;
   accessNotice: string | null;
@@ -187,6 +192,16 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [loadCatalog]);
 
+  const loadStatus = useMemo(
+    () =>
+      resolveCatalogLoadStatus({
+        loading,
+        errorKind,
+        productCount: products.length,
+      }),
+    [loading, errorKind, products.length]
+  );
+
   const value = useMemo<CatalogContextValue>(
     () => ({
       products,
@@ -194,6 +209,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       storeSettings,
       isStoreActive: storeSettings.isStoreActive,
       loading,
+      loadStatus,
       error,
       errorKind,
       accessNotice,
@@ -202,7 +218,17 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       refreshCatalog: loadCatalog,
     }),
-    [products, categories, storeSettings, loading, error, errorKind, accessNotice, loadCatalog]
+    [
+      products,
+      categories,
+      storeSettings,
+      loading,
+      loadStatus,
+      error,
+      errorKind,
+      accessNotice,
+      loadCatalog,
+    ]
   );
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

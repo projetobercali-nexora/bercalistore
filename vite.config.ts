@@ -1,12 +1,96 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
-export default defineConfig(() => {
+function cleanEnvValue(raw: string | undefined): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  let cleaned = raw.trim();
+  if (!cleaned) return undefined;
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.length >= 2) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'") && cleaned.length >= 2)
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return cleaned || undefined;
+}
+
+function isSafePublicSupabaseKey(rawKey: string | undefined): boolean {
+  const key = cleanEnvValue(rawKey);
+  if (!key) return false;
+  if (key.startsWith('sb_secret_')) return false;
+  if (key.startsWith('sb_publishable_')) return key.length > 20;
+
+  const parts = key.split('.');
+  if (parts.length === 3) {
+    try {
+      const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf-8');
+      const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+      return payload.role !== 'service_role';
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function resolveBuildTimePublicSupabaseEnv(allEnv: Record<string, string | undefined>) {
+  const urlCandidates = [
+    'VITE_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'PUBLIC_SUPABASE_URL',
+    'REACT_APP_SUPABASE_URL',
+    'SUPABASE_URL',
+  ];
+  const keyCandidates = [
+    'VITE_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+    'VITE_SUPABASE_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+    'PUBLIC_SUPABASE_ANON_KEY',
+    'PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'REACT_APP_SUPABASE_ANON_KEY',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+  ];
+
+  let url = '';
+  for (const name of urlCandidates) {
+    const val = cleanEnvValue(allEnv[name])?.replace(/\/+$/, '');
+    if (val && /^https:\/\/|^http:\/\/localhost\b/i.test(val)) {
+      url = val;
+      break;
+    }
+  }
+
+  let publicKey = '';
+  for (const name of keyCandidates) {
+    const val = cleanEnvValue(allEnv[name]);
+    if (val && isSafePublicSupabaseKey(val)) {
+      publicKey = val;
+      break;
+    }
+  }
+
+  return {url, publicKey};
+}
+
+export default defineConfig(({mode}) => {
+  const fileEnv = loadEnv(mode, process.cwd(), '');
+  const mergedEnv: Record<string, string | undefined> = {...fileEnv, ...process.env};
+  const resolvedSupabase = resolveBuildTimePublicSupabaseEnv(mergedEnv);
+
   return {
-    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_', 'PUBLIC_'],
+    define: {
+      __BERCALI_SUPABASE_URL__: JSON.stringify(resolvedSupabase.url),
+      __BERCALI_SUPABASE_PUBLIC_KEY__: JSON.stringify(resolvedSupabase.publicKey),
+    },
     plugins: [
       react(),
       tailwindcss(),
