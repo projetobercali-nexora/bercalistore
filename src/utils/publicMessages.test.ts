@@ -4,15 +4,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   PUBLIC_MESSAGES,
+  buildCatalogTechnicalDiagnostic,
   classifyCatalogError,
   containsTechnicalJargon,
   isLikelyNetworkFailure,
+  isMissingColumnOrSchemaCacheError,
   resolveCatalogLoadStatus,
 } from './publicMessages';
 import {
   normalizeSupabaseUrl,
   resolveSupabasePublicEnv,
   sanitizeEnvValue,
+  sanitizeSupabaseKey,
 } from '../lib/supabase';
 
 function createFakeJwt(payload: Record<string, unknown>): string {
@@ -115,7 +118,7 @@ test('classifyCatalogError and resolveCatalogLoadStatus clearly separate all 4 P
   );
 });
 
-test('sanitizeEnvValue and normalizeSupabaseUrl handle Vercel copy-paste quotes and trailing slashes', () => {
+test('sanitizeEnvValue, normalizeSupabaseUrl, and sanitizeSupabaseKey handle Vercel copy-paste artifacts cleanly', () => {
   assert.equal(
     sanitizeEnvValue('  "https://dyhwbzyiuzrdmiogzwdg.supabase.co"  '),
     'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
@@ -124,11 +127,32 @@ test('sanitizeEnvValue and normalizeSupabaseUrl handle Vercel copy-paste quotes 
     sanitizeEnvValue(" 'sb_publishable_abcdefghijklmnopqrstuvwxyz' "),
     'sb_publishable_abcdefghijklmnopqrstuvwxyz'
   );
+  assert.equal(
+    sanitizeEnvValue(' `https://dyhwbzyiuzrdmiogzwdg.supabase.co` '),
+    'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
+  );
   assert.equal(sanitizeEnvValue('   '), undefined);
+  assert.equal(sanitizeEnvValue('undefined'), undefined);
   assert.equal(
     normalizeSupabaseUrl('"https://dyhwbzyiuzrdmiogzwdg.supabase.co///"'),
     'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
   );
+  assert.equal(
+    normalizeSupabaseUrl('VITE_SUPABASE_URL=https://dyhwbzyiuzrdmiogzwdg.supabase.co/rest/v1/'),
+    'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
+  );
+  assert.equal(
+    normalizeSupabaseUrl('dyhwbzyiuzrdmiogzwdg.supabase.co'),
+    'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
+  );
+  assert.equal(
+    normalizeSupabaseUrl('dyhwbzyiuzrdmiogzwdg'),
+    'https://dyhwbzyiuzrdmiogzwdg.supabase.co'
+  );
+
+  const anonJwt = createFakeJwt({ role: 'anon', iss: 'supabase' });
+  const wrappedMultilineJwt = `VITE_SUPABASE_ANON_KEY="Bearer ${anonJwt.slice(0, 20)}\n  ${anonJwt.slice(20)}"`;
+  assert.equal(sanitizeSupabaseKey(wrappedMultilineJwt), anonJwt);
 });
 
 test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ fallbacks, and blocks secret keys', () => {
@@ -137,12 +161,14 @@ test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ 
 
   const standardVite = resolveSupabasePublicEnv({
     VITE_SUPABASE_URL: '"https://dyhwbzyiuzrdmiogzwdg.supabase.co/"',
-    VITE_SUPABASE_ANON_KEY: `"${anonJwt}"`,
+    VITE_SUPABASE_ANON_KEY: `"${anonJwt.slice(0, 15)}\n${anonJwt.slice(15)}"`,
   });
   assert.equal(standardVite.configured, true);
   assert.equal(standardVite.url, 'https://dyhwbzyiuzrdmiogzwdg.supabase.co');
+  assert.equal(standardVite.urlHost, 'dyhwbzyiuzrdmiogzwdg.supabase.co');
   assert.equal(standardVite.urlSource, 'VITE_SUPABASE_URL');
   assert.equal(standardVite.keySource, 'VITE_SUPABASE_ANON_KEY');
+  assert.equal(standardVite.keyKind, 'jwt_anon');
 
   const vercelIntegrationFallback = resolveSupabasePublicEnv({
     NEXT_PUBLIC_SUPABASE_URL: 'https://dyhwbzyiuzrdmiogzwdg.supabase.co',
@@ -151,6 +177,7 @@ test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ 
   assert.equal(vercelIntegrationFallback.configured, true);
   assert.equal(vercelIntegrationFallback.urlSource, 'NEXT_PUBLIC_SUPABASE_URL');
   assert.equal(vercelIntegrationFallback.keySource, 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  assert.equal(vercelIntegrationFallback.keyKind, 'sb_publishable');
 
   const unprefixedVercelFallback = resolveSupabasePublicEnv({
     SUPABASE_URL: 'https://dyhwbzyiuzrdmiogzwdg.supabase.co',
@@ -170,6 +197,7 @@ test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ 
     valid: false,
     reason: 'forbidden_secret_key',
   });
+  assert.equal(forbiddenServiceRole.keyKind, 'forbidden_secret_key');
 
   const forbiddenSecretKey = resolveSupabasePublicEnv({
     VITE_SUPABASE_URL: 'https://dyhwbzyiuzrdmiogzwdg.supabase.co',
@@ -177,6 +205,55 @@ test('resolveSupabasePublicEnv supports VITE_ primary vars, Vercel NEXT_PUBLIC_ 
   });
   assert.equal(forbiddenSecretKey.configured, false);
   assert.equal(forbiddenSecretKey.anonKey, undefined);
+});
+
+test('buildCatalogTechnicalDiagnostic distinguishes CONFIGURATION, AUTH_INVALID_KEY, RLS_PERMISSION, SQL_QUERY_SCHEMA, NETWORK_OR_CORS, and DATA_STRUCTURE without exposing keys', () => {
+  const configDiag = buildCatalogTechnicalDiagnostic({
+    configured: false,
+    supabaseHost: null,
+    urlSource: null,
+    keySource: null,
+    keyKind: 'missing',
+    keyLength: 0,
+  });
+  assert.equal(configDiag.category, 'CONFIGURATION');
+
+  const authDiag = buildCatalogTechnicalDiagnostic({
+    configured: true,
+    supabaseHost: 'dyhwbzyiuzrdmiogzwdg.supabase.co',
+    postgrestError: { status: 401, message: 'Invalid API key' },
+  });
+  assert.equal(authDiag.category, 'AUTH_INVALID_KEY');
+
+  const rlsDiag = buildCatalogTechnicalDiagnostic({
+    configured: true,
+    supabaseHost: 'dyhwbzyiuzrdmiogzwdg.supabase.co',
+    postgrestError: { code: '42501', status: 403, message: 'permission denied for table products' },
+  });
+  assert.equal(rlsDiag.category, 'RLS_PERMISSION');
+
+  const schemaDiag = buildCatalogTechnicalDiagnostic({
+    configured: true,
+    supabaseHost: 'dyhwbzyiuzrdmiogzwdg.supabase.co',
+    postgrestError: { code: '42703', message: 'column products.unknown_col does not exist' },
+  });
+  assert.equal(schemaDiag.category, 'SQL_QUERY_SCHEMA');
+  assert.equal(isMissingColumnOrSchemaCacheError({ code: '42703' }), true);
+  assert.equal(isMissingColumnOrSchemaCacheError({ code: 'PGRST204' }), true);
+
+  const networkDiag = buildCatalogTechnicalDiagnostic({
+    configured: true,
+    supabaseHost: 'dyhwbzyiuzrdmiogzwdg.supabase.co',
+    thrownError: new TypeError('Failed to fetch'),
+  });
+  assert.equal(networkDiag.category, 'NETWORK_OR_CORS');
+
+  const dataDiag = buildCatalogTechnicalDiagnostic({
+    configured: true,
+    supabaseHost: 'dyhwbzyiuzrdmiogzwdg.supabase.co',
+    dataStructureIssue: 'Resposta não é uma lista.',
+  });
+  assert.equal(dataDiag.category, 'DATA_STRUCTURE');
 });
 
 test('public pages and components contain no exposed database configuration warnings', () => {

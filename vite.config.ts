@@ -4,31 +4,85 @@ import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
 
+function stripQuotes(value: string): string {
+  let current = value.trim();
+  while (
+    current.length >= 2 &&
+    ((current.startsWith('"') && current.endsWith('"')) ||
+      (current.startsWith("'") && current.endsWith("'")) ||
+      (current.startsWith('`') && current.endsWith('`')))
+  ) {
+    current = current.slice(1, -1).trim();
+  }
+  return current;
+}
+
 function cleanEnvValue(raw: string | undefined): string | undefined {
   if (typeof raw !== 'string') return undefined;
-  let cleaned = raw.trim();
+  const cleaned = stripQuotes(raw.replace(/[\u200B-\u200D\uFEFF]/g, ''));
   if (!cleaned) return undefined;
-  if (
-    (cleaned.startsWith('"') && cleaned.endsWith('"') && cleaned.length >= 2) ||
-    (cleaned.startsWith("'") && cleaned.endsWith("'") && cleaned.length >= 2)
+  const lower = cleaned.toLowerCase();
+  if (lower === 'undefined' || lower === 'null') return undefined;
+  return cleaned;
+}
+
+function normalizeBuildSupabaseUrl(rawUrl: string | undefined): string | undefined {
+  const initial = cleanEnvValue(rawUrl);
+  if (!initial) return undefined;
+
+  let cleaned = stripQuotes(
+    initial.replace(/^(?:VITE_|NEXT_PUBLIC_|PUBLIC_|REACT_APP_)?SUPABASE_URL\s*=\s*/i, '')
+  ).replace(/\s+/g, '');
+
+  if (!cleaned) return undefined;
+
+  if (/^[a-z0-9]{20}$/.test(cleaned)) {
+    cleaned = `https://${cleaned}.supabase.co`;
+  } else if (
+    !/^https?:\/\//i.test(cleaned) &&
+    /^[a-z0-9-]+\.supabase\.(co|in)(\/.*)?$/i.test(cleaned)
   ) {
-    cleaned = cleaned.slice(1, -1).trim();
+    cleaned = `https://${cleaned}`;
   }
+
+  cleaned = cleaned
+    .replace(/\/+$/, '')
+    .replace(/\/(?:rest|auth|storage)\/v1$/i, '')
+    .replace(/\/+$/, '');
+
   return cleaned || undefined;
 }
 
+function cleanBuildSupabaseKey(rawKey: string | undefined): string | undefined {
+  const initial = cleanEnvValue(rawKey);
+  if (!initial) return undefined;
+
+  const afterKeyEq = stripQuotes(
+    initial.replace(
+      /^(?:VITE_|NEXT_PUBLIC_|PUBLIC_|REACT_APP_)?SUPABASE_(?:ANON|PUBLISHABLE(?:_DEFAULT)?|PUBLIC)?_?KEY\s*=\s*/i,
+      ''
+    )
+  );
+  const withoutPrefix = stripQuotes(afterKeyEq.replace(/^Bearer\s+/i, '')).replace(/\s+/g, '');
+
+  if (!withoutPrefix) return undefined;
+  const lower = withoutPrefix.toLowerCase();
+  if (lower === 'undefined' || lower === 'null') return undefined;
+  return withoutPrefix;
+}
+
 function isSafePublicSupabaseKey(rawKey: string | undefined): boolean {
-  const key = cleanEnvValue(rawKey);
+  const key = cleanBuildSupabaseKey(rawKey);
   if (!key) return false;
   if (key.startsWith('sb_secret_')) return false;
   if (key.startsWith('sb_publishable_')) return key.length > 20;
 
   const parts = key.split('.');
-  if (parts.length === 3) {
+  if (parts.length === 3 && parts[0] && parts[1] && parts[2]) {
     try {
       const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf-8');
       const payload = JSON.parse(payloadJson) as Record<string, unknown>;
-      return payload.role !== 'service_role';
+      return payload.role !== 'service_role' && payload.role !== 'supabase_admin';
     } catch {
       return false;
     }
@@ -61,7 +115,7 @@ function resolveBuildTimePublicSupabaseEnv(allEnv: Record<string, string | undef
 
   let url = '';
   for (const name of urlCandidates) {
-    const val = cleanEnvValue(allEnv[name])?.replace(/\/+$/, '');
+    const val = normalizeBuildSupabaseUrl(allEnv[name]);
     if (val && /^https:\/\/|^http:\/\/localhost\b/i.test(val)) {
       url = val;
       break;
@@ -70,7 +124,7 @@ function resolveBuildTimePublicSupabaseEnv(allEnv: Record<string, string | undef
 
   let publicKey = '';
   for (const name of keyCandidates) {
-    const val = cleanEnvValue(allEnv[name]);
+    const val = cleanBuildSupabaseKey(allEnv[name]);
     if (val && isSafePublicSupabaseKey(val)) {
       publicKey = val;
       break;
@@ -137,22 +191,29 @@ export default defineConfig(({mode}) => {
           clientsClaim: true,
           cleanupOutdatedCaches: true,
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          // Evita precache estático de index.html para impedir que um Service Worker antigo na Vercel
+          // continue a servir um bundle anterior à configuração das variáveis de ambiente.
+          globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}'],
           globIgnores: ['**/Manual_de_Marca_*', '**/Paste_*', 'demo-media/**'],
-          navigateFallback: '/index.html',
-          navigateFallbackDenylist: [
-            /^\/api\//,
-            /^\/rest\//,
-            /^\/auth\//,
-            /manifest\.webmanifest$/,
-            /sw\.js$/,
-            /dev-sw\.js$/,
-            /workbox-.*\.js$/,
-            /\.mp4$/,
-            /\.webm$/,
-            /\.pdf$/,
-          ],
+          navigateFallback: null,
           runtimeCaching: [
+            {
+              // Navegação HTML usa sempre NetworkFirst para carregar de imediato cada novo deploy na Vercel,
+              // mantendo fallback offline para a PWA instalada quando não houver internet.
+              urlPattern: ({request}) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'bercali-html-navigation',
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 7,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               // Imagens públicas de produtos no Supabase Storage: prioriza sempre a rede para refletir
               // alterações imediatas do Painel Administrativo, com fallback em caso de falha momentânea.

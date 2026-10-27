@@ -11,9 +11,12 @@ import type {
 } from '../types/store';
 import { hasValidationErrors, validateCheckoutForm } from '../utils/checkout';
 import {
+  buildCatalogTechnicalDiagnostic,
   classifyCatalogError,
+  isMissingColumnOrSchemaCacheError,
   PUBLIC_MESSAGES,
   type CatalogErrorKind,
+  type PostgrestLikeError,
 } from '../utils/publicMessages';
 import {
   applyFeaturedSelection,
@@ -105,6 +108,20 @@ async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
   return [];
 }
 
+function toPostgrestLikeError(
+  error: { code?: string; message?: string; details?: string | null; hint?: string | null } | null,
+  status?: number
+): PostgrestLikeError | null {
+  if (!error) return null;
+  return {
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    status,
+  };
+}
+
 export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogResponse> {
   const defaultSettings = createDefaultPublicStoreSettings();
   const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -112,7 +129,17 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
   if (!supabase || !SUPABASE_CONFIG_STATUS.configured) {
     if (typeof console !== 'undefined') {
       console.error(
-        '[Bercali Store · Diagnóstico Catálogo] Cliente público não inicializado. Confirma VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nas variáveis de ambiente.'
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: false,
+          isOffline: browserOffline,
+          table: 'public.products',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          urlSource: SUPABASE_CONFIG_STATUS.urlSource,
+          keySource: SUPABASE_CONFIG_STATUS.keySource,
+          keyKind: SUPABASE_CONFIG_STATUS.keyKind,
+          keyLength: SUPABASE_CONFIG_STATUS.keyLength,
+        })
       );
     }
     const classified = classifyCatalogError({
@@ -132,7 +159,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
   }
 
   try {
-    const [categoriesRes, productsRes, mediaRes, settingsRes] = await Promise.all([
+    let [categoriesRes, productsRes, mediaRes, settingsRes] = await Promise.all([
       supabase
         .from('categories')
         .select(CATEGORIES_COLUMNS)
@@ -148,42 +175,90 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       supabase.from('store_settings').select('setting_key, setting_value'),
     ]);
 
-    if (categoriesRes.error && typeof console !== 'undefined') {
-      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler categories:', {
-        code: categoriesRes.error.code,
-        message: categoriesRes.error.message,
-      });
-    }
-    if (mediaRes.error && typeof console !== 'undefined') {
-      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler product_media:', {
-        code: mediaRes.error.code,
-        message: mediaRes.error.message,
-      });
-    }
-    if (settingsRes.error && typeof console !== 'undefined') {
-      console.warn('[Bercali Store · Diagnóstico Catálogo] Aviso ao ler store_settings:', {
-        code: settingsRes.error.code,
-        message: settingsRes.error.message,
-      });
+    // Fallback resiliente: se alguma coluna opcional não existir no esquema atual, repete com select('*')
+    if (productsRes.error && isMissingColumnOrSchemaCacheError(productsRes.error)) {
+      if (typeof console !== 'undefined') {
+        console.warn('[Bercali Store · Diagnóstico Catálogo]', {
+          category: 'SQL_QUERY_SCHEMA',
+          table: 'public.products',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          code: productsRes.error.code,
+          message: productsRes.error.message,
+          fallback: 'A repetir consulta a public.products com select("*") por diferença de colunas.',
+        });
+      }
+      const fallbackProducts = await supabase.from('products').select('*');
+      productsRes = fallbackProducts as typeof productsRes;
     }
 
-    const rawSettings = settingsRes.error
-      ? []
-      : ((settingsRes.data ?? []) as unknown as SupabaseStoreSettingRow[]);
+    if (categoriesRes.error && isMissingColumnOrSchemaCacheError(categoriesRes.error)) {
+      const fallbackCategories = await supabase.from('categories').select('*');
+      categoriesRes = fallbackCategories as typeof categoriesRes;
+    }
+
+    if (mediaRes.error && isMissingColumnOrSchemaCacheError(mediaRes.error)) {
+      const fallbackMedia = await supabase.from('product_media').select('*');
+      mediaRes = fallbackMedia as typeof mediaRes;
+    }
+
+    if (categoriesRes.error && typeof console !== 'undefined') {
+      console.warn(
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          table: 'public.categories',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          postgrestError: toPostgrestLikeError(categoriesRes.error, categoriesRes.status),
+        })
+      );
+    }
+    if (mediaRes.error && typeof console !== 'undefined') {
+      console.warn(
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          table: 'public.product_media',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          postgrestError: toPostgrestLikeError(mediaRes.error, mediaRes.status),
+        })
+      );
+    }
+    if (settingsRes.error && typeof console !== 'undefined') {
+      console.warn(
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          table: 'public.store_settings',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          postgrestError: toPostgrestLikeError(settingsRes.error, settingsRes.status),
+        })
+      );
+    }
+
+    const rawSettings =
+      !settingsRes.error && Array.isArray(settingsRes.data)
+        ? (settingsRes.data as unknown as SupabaseStoreSettingRow[])
+        : [];
     const storeSettings = extractPublicStoreSettings(rawSettings, SUPABASE_PUBLIC_URL);
 
     if (productsRes.error) {
+      const pgError = toPostgrestLikeError(productsRes.error, productsRes.status);
       if (typeof console !== 'undefined') {
-        console.error('[Bercali Store · Diagnóstico Catálogo] Erro ao consultar products:', {
-          code: productsRes.error.code,
-          message: productsRes.error.message,
-          details: productsRes.error.details,
-        });
+        console.error(
+          '[Bercali Store · Diagnóstico Catálogo]',
+          buildCatalogTechnicalDiagnostic({
+            configured: true,
+            isOffline: browserOffline,
+            table: 'public.products',
+            supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+            postgrestError: pgError,
+          })
+        );
       }
       const classified = classifyCatalogError({
         configured: true,
         isOffline: browserOffline,
-        postgrestError: productsRes.error,
+        postgrestError: pgError,
       });
       return {
         products: [],
@@ -197,19 +272,86 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       };
     }
 
+    if (productsRes.data !== null && !Array.isArray(productsRes.data)) {
+      const issue = `Resposta de public.products não é uma lista (tipo recebido: ${typeof productsRes.data}).`;
+      if (typeof console !== 'undefined') {
+        console.error(
+          '[Bercali Store · Diagnóstico Catálogo]',
+          buildCatalogTechnicalDiagnostic({
+            configured: true,
+            table: 'public.products',
+            supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+            dataStructureIssue: issue,
+          })
+        );
+      }
+      return {
+        products: [],
+        categories: [],
+        storeSettings,
+        whatsappNumber: storeSettings.whatsappNumber,
+        deliveryFeeRules: storeSettings.deliveryFeeRules,
+        error: PUBLIC_MESSAGES.catalogTemporaryError,
+        errorKind: 'unavailable',
+        accessNotice: null,
+      };
+    }
+
     const rawProducts = (productsRes.data ?? []) as unknown as SupabaseProductRow[];
-    const rawCategories = categoriesRes.error
-      ? []
-      : ((categoriesRes.data ?? []) as unknown as SupabaseCategoryRow[]);
-    const rawMedia = mediaRes.error
-      ? []
-      : ((mediaRes.data ?? []) as unknown as SupabaseProductMediaRow[]);
+    const rawCategories =
+      !categoriesRes.error && Array.isArray(categoriesRes.data)
+        ? (categoriesRes.data as unknown as SupabaseCategoryRow[])
+        : [];
+    const rawMedia =
+      !mediaRes.error && Array.isArray(mediaRes.data)
+        ? (mediaRes.data as unknown as SupabaseProductMediaRow[])
+        : [];
 
     const hydratedRows = attachRelationsToProducts(rawProducts, rawCategories, rawMedia);
 
-    const mappedProducts = hydratedRows
-      .map((row) => mapSupabaseProductToStoreProduct(row, SUPABASE_PUBLIC_URL))
-      .filter((item): item is Product => item !== null);
+    const mappedProducts: Product[] = [];
+    let malformedRowsCount = 0;
+
+    for (const row of hydratedRows) {
+      try {
+        if (!row || typeof row !== 'object' || !row.id || !row.name) {
+          malformedRowsCount += 1;
+          continue;
+        }
+        const mapped = mapSupabaseProductToStoreProduct(row, SUPABASE_PUBLIC_URL);
+        if (mapped) {
+          mappedProducts.push(mapped);
+        }
+      } catch (rowError) {
+        malformedRowsCount += 1;
+        if (typeof console !== 'undefined') {
+          console.warn(
+            '[Bercali Store · Diagnóstico Catálogo]',
+            buildCatalogTechnicalDiagnostic({
+              configured: true,
+              table: 'public.products',
+              supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+              dataStructureIssue:
+                rowError instanceof Error
+                  ? rowError.message
+                  : 'Erro ao converter registo individual de produto.',
+            })
+          );
+        }
+      }
+    }
+
+    if (malformedRowsCount > 0 && typeof console !== 'undefined') {
+      console.warn(
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          table: 'public.products',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          dataStructureIssue: `${malformedRowsCount} registo(s) ignorado(s) por campos obrigatórios em falta (id ou name).`,
+        })
+      );
+    }
 
     const productsWithMedia = await Promise.all(
       mappedProducts.map(async (product) => {
@@ -237,15 +379,26 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       const hasUploadedProductAssets =
         !storageProbe.error && Array.isArray(storageProbe.data) && storageProbe.data.length > 0;
 
-      if (hasUploadedProductAssets && typeof console !== 'undefined') {
-        console.warn(
-          '[Bercali Store · Diagnóstico Catálogo] Consulta pública devolveu 0 linhas em products apesar de existirem ficheiros em product-media. Verifica o estado de publicação dos produtos ou políticas SELECT.'
-        );
+      if (typeof console !== 'undefined') {
+        console.warn('[Bercali Store · Diagnóstico Catálogo]', {
+          category: hasUploadedProductAssets ? 'RLS_PERMISSION' : 'SQL_QUERY_SCHEMA',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          rawProductsCount: 0,
+          hasUploadedProductAssets,
+          summary: hasUploadedProductAssets
+            ? 'A consulta pública a public.products devolveu 0 linhas apesar de existirem imagens no bucket product-media. Verifica políticas SELECT RLS para o papel anon ou se os produtos estão publicados.'
+            : 'A consulta pública a public.products devolveu 0 linhas neste projeto Supabase. Confirma se VITE_SUPABASE_URL aponta para o mesmo projeto do Painel Administrativo e se existem produtos ativos.',
+        });
       }
     } else if (finalProducts.length === 0 && rawProducts.length > 0 && typeof console !== 'undefined') {
-      console.info(
-        '[Bercali Store · Diagnóstico Catálogo] Os registos recebidos de products encontram-se em estado não publicado (rascunho/inativo/arquivado).'
-      );
+      console.info('[Bercali Store · Diagnóstico Catálogo]', {
+        category: 'DATA_STRUCTURE',
+        supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+        rawProductsCount: rawProducts.length,
+        publishedProductsCount: 0,
+        summary:
+          'Foram lidos registos em public.products, mas todos se encontram não publicados (ex.: rascunho, inativo ou arquivado).',
+      });
     }
 
     return {
@@ -259,15 +412,22 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       accessNotice: null,
     };
   } catch (thrownError) {
+    const offlineNow = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (typeof console !== 'undefined') {
       console.error(
-        '[Bercali Store · Diagnóstico Catálogo] Falha de ligação ao carregar catálogo:',
-        thrownError
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          isOffline: offlineNow,
+          table: 'public.products',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          thrownError,
+        })
       );
     }
     const classified = classifyCatalogError({
       configured: true,
-      isOffline: typeof navigator !== 'undefined' && navigator.onLine === false,
+      isOffline: offlineNow,
       thrownError,
     });
     return {
@@ -372,16 +532,29 @@ export async function submitOrderToSupabase(
       const productIds = Array.from(new Set(requestedItems.map((i) => i.productId)));
 
       // 1. Revalidação autoritativa do estado da loja, stock e preços reais no Supabase
-      const [liveProductsRes, liveSettingsRes] = await Promise.all([
+      let [liveProductsRes, liveSettingsRes] = await Promise.all([
         supabase.from('products').select(PRODUCTS_COLUMNS).in('id', productIds),
         supabase.from('store_settings').select('setting_key, setting_value'),
       ]);
 
+      if (liveProductsRes.error && isMissingColumnOrSchemaCacheError(liveProductsRes.error)) {
+        const fallbackLiveProducts = await supabase
+          .from('products')
+          .select('*')
+          .in('id', productIds);
+        liveProductsRes = fallbackLiveProducts as typeof liveProductsRes;
+      }
+
       if (liveProductsRes.error) {
         if (typeof console !== 'undefined') {
           console.error(
-            '[Bercali Store · Diagnóstico Encomenda] Falha ao revalidar produtos:',
-            liveProductsRes.error
+            '[Bercali Store · Diagnóstico Encomenda]',
+            buildCatalogTechnicalDiagnostic({
+              configured: true,
+              table: 'public.products',
+              supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+              postgrestError: toPostgrestLikeError(liveProductsRes.error, liveProductsRes.status),
+            })
           );
         }
         return {

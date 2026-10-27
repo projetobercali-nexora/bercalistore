@@ -67,49 +67,47 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-13942bd7'], (function (workbox) { 'use strict';
+define(['./workbox-07b25d35'], (function (workbox) { 'use strict';
 
-  self.skipWaiting();
-  workbox.clientsClaim();
-  /**
-   * The precacheAndRoute() method efficiently caches and responds to
-   * requests for URLs in the manifest.
-   * See https://goo.gl/S9QRab
-   */
-  workbox.precacheAndRoute([{
-    "url": "/index.html",
-    "revision": "0.3n594havmh8"
-  }], {});
-  workbox.cleanupOutdatedCaches();
-  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
-    allowlist: [/^\/$/],
-    denylist: [/^\/api\//, /^\/rest\//, /^\/auth\//, /manifest\.webmanifest$/, /sw\.js$/, /dev-sw\.js$/, /workbox-.*\.js$/, /\.mp4$/, /\.webm$/, /\.pdf$/]
-  }));
-  workbox.registerRoute(/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/storage\/v1\/object\/public\/.*/i, new workbox.NetworkFirst({
-    "cacheName": "bercali-supabase-product-images",
-    "networkTimeoutSeconds": 4,
-    plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 60,
-      maxAgeSeconds: 604800
-    }), new workbox.CacheableResponsePlugin({
-      statuses: [0, 200]
-    })]
-  }), 'GET');
-  workbox.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i, new workbox.StaleWhileRevalidate({
-    "cacheName": "bercali-google-fonts-stylesheets",
-    plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 10,
-      maxAgeSeconds: 2592000
-    })]
-  }), 'GET');
-  workbox.registerRoute(/^https:\/\/fonts\.gstatic\.com\/.*/i, new workbox.CacheFirst({
-    "cacheName": "bercali-google-fonts-webfonts",
-    plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 20,
-      maxAgeSeconds: 31536000
-    }), new workbox.CacheableResponsePlugin({
-      statuses: [0, 200]
-    })]
-  }), 'GET');
+	self.skipWaiting();
+	workbox.clientsClaim();
+	workbox.registerRoute(({
+	  request
+	}) => request.mode === "navigate", new workbox.NetworkFirst({
+	  "cacheName": "bercali-html-navigation",
+	  "networkTimeoutSeconds": 3,
+	  plugins: [new workbox.ExpirationPlugin({
+	    maxEntries: 10,
+	    maxAgeSeconds: 604800
+	  }), new workbox.CacheableResponsePlugin({
+	    statuses: [0, 200]
+	  })]
+	}), 'GET');
+	workbox.registerRoute(/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/storage\/v1\/object\/public\/.*/i, new workbox.NetworkFirst({
+	  "cacheName": "bercali-supabase-product-images",
+	  "networkTimeoutSeconds": 4,
+	  plugins: [new workbox.ExpirationPlugin({
+	    maxEntries: 60,
+	    maxAgeSeconds: 604800
+	  }), new workbox.CacheableResponsePlugin({
+	    statuses: [0, 200]
+	  })]
+	}), 'GET');
+	workbox.registerRoute(/^https:\/\/fonts\.googleapis\.com\/.*/i, new workbox.StaleWhileRevalidate({
+	  "cacheName": "bercali-google-fonts-stylesheets",
+	  plugins: [new workbox.ExpirationPlugin({
+	    maxEntries: 10,
+	    maxAgeSeconds: 2592000
+	  })]
+	}), 'GET');
+	workbox.registerRoute(/^https:\/\/fonts\.gstatic\.com\/.*/i, new workbox.CacheFirst({
+	  "cacheName": "bercali-google-fonts-webfonts",
+	  plugins: [new workbox.ExpirationPlugin({
+	    maxEntries: 20,
+	    maxAgeSeconds: 31536000
+	  }), new workbox.CacheableResponsePlugin({
+	    statuses: [0, 200]
+	  })]
+	}), 'GET');
 
 }));
