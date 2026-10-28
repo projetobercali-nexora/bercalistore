@@ -80,16 +80,18 @@ export const Header: React.FC = () => {
             </a>
           </nav>
 
-          {/* Zona 3: Ações rápidas (Pesquisa, Carrinho e Menu móvel) */}
+          {/* Zona 3: Ações rápidas (Pesquisa nas páginas internas, Carrinho e Menu móvel) */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleSearchAction}
-              aria-label="Pesquisar produtos"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-white/90 hover:bg-[#1A1A1A] hover:text-[#FF8A00] transition-colors cursor-pointer"
-            >
-              <Search className="h-5 w-5" />
-            </button>
+            {location.pathname !== '/' && (
+              <button
+                type="button"
+                onClick={handleSearchAction}
+                aria-label="Pesquisar produtos"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-white/90 hover:bg-[#1A1A1A] hover:text-[#FF8A00] transition-colors cursor-pointer"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+            )}
 
             <Link
               to="/carrinho"
