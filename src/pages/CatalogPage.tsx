@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { CategoryList } from '../components/CategoryList';
@@ -7,17 +7,36 @@ import { SearchBar } from '../components/SearchBar';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
 import { useCatalog } from '../context/CatalogContext';
 import { filterProducts } from '../utils/catalog';
+import { trackMetaSearch } from '../utils/metaPixel';
 import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 export const CatalogPage: React.FC = () => {
   const { products, categories, loading, error, refreshCatalog } = useCatalog();
   const [searchParams, setSearchParams] = useSearchParams();
+  const lastTrackedQueryRef = useRef<string>('');
 
   const query = searchParams.get('q') ?? '';
   const selectedCategory = searchParams.get('categoria') ?? 'all';
   const onlyAvailable = searchParams.get('disponiveis') === '1';
   const onlyPromos = searchParams.get('promocoes') === '1';
   const shouldFocusSearch = searchParams.get('foco') === 'pesquisa';
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      if (!trimmed) {
+        lastTrackedQueryRef.current = '';
+      }
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (lastTrackedQueryRef.current !== trimmed) {
+        lastTrackedQueryRef.current = trimmed;
+        trackMetaSearch(trimmed);
+      }
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   const filteredProducts = useMemo(
     () =>

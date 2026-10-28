@@ -18,7 +18,62 @@ export function isValidWhatsAppNumber(phoneConfig: string): boolean {
   if (!trimmed || trimmed === 'SUBSTITUIR_PELO_NUMERO_OFICIAL') {
     return false;
   }
-  return /^\d{8,15}$/.test(trimmed);
+  return /^\d{8,15}$/.test(trimmed) && !/^0+$/.test(trimmed);
+}
+
+/**
+ * Normaliza qualquer número de WhatsApp vindo de `store_settings` para os dígitos internacionais
+ * usados em links `https://wa.me/<digitos>` (ex.: "+244 923 000 000" ou "923000000" -> "244923000000").
+ * Devolve string vazia ('') se estiver em branco ou for inválido.
+ */
+export function normalizeWhatsAppNumber(raw: unknown): string {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    return normalizeWhatsAppNumber(String(Math.trunc(raw)));
+  }
+  if (typeof raw !== 'string') {
+    return '';
+  }
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'SUBSTITUIR_PELO_NUMERO_OFICIAL') {
+    return '';
+  }
+
+  let digits = trimmed.replace(/\D/g, '');
+  if (!digits || /^0+$/.test(digits)) {
+    return '';
+  }
+
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+  }
+
+  // Número angolano de 9 dígitos (telemóvel 9xx xxx xxx ou fixo 2xx xxx xxx) -> prefixo internacional 244
+  if (digits.length === 9 && (digits.startsWith('9') || digits.startsWith('2'))) {
+    digits = `244${digits}`;
+  } else if (digits.length === 13 && digits.startsWith('2440')) {
+    digits = `244${digits.slice(4)}`;
+  }
+
+  return /^\d{8,15}$/.test(digits) && !/^0+$/.test(digits) ? digits : '';
+}
+
+export function formatInternationalWhatsApp(raw: unknown): string {
+  const digits = normalizeWhatsAppNumber(raw);
+  return digits ? `+${digits}` : '';
+}
+
+export function hasConfiguredWhatsApp(raw: unknown): boolean {
+  return normalizeWhatsAppNumber(raw).length > 0;
+}
+
+export function getDeliveryRuleLabel(rule: DeliveryFeeRule): string {
+  if (rule.zoneName && rule.zoneName.trim()) {
+    return rule.zoneName.trim();
+  }
+  return [rule.province, rule.municipality, rule.neighborhood]
+    .map((p) => (p ?? '').trim())
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function isValidEmailAddress(rawEmail: string): boolean {
@@ -27,8 +82,18 @@ export function isValidEmailAddress(rawEmail: string): boolean {
   return EMAIL_PATTERN.test(trimmed);
 }
 
-export function validateCheckoutForm(data: CustomerCheckoutData): CheckoutValidationErrors {
+export interface CheckoutValidationOptions {
+  mode?: 'legacy' | 'storefront';
+  deliveryZones?: readonly DeliveryFeeRule[];
+}
+
+export function validateCheckoutForm(
+  data: CustomerCheckoutData,
+  options?: CheckoutValidationOptions
+): CheckoutValidationErrors {
   const errors: CheckoutValidationErrors = {};
+  const mode = options?.mode ?? 'legacy';
+  const deliveryZones = options?.deliveryZones ?? [];
 
   const fullName = data.fullName.trim();
   if (!fullName) {
@@ -47,6 +112,16 @@ export function validateCheckoutForm(data: CustomerCheckoutData): CheckoutValida
   const emailTrimmed = (data.email ?? '').trim();
   if (emailTrimmed && !isValidEmailAddress(emailTrimmed)) {
     errors.email = 'Introduz um endereço de e-mail válido ou deixa em branco.';
+  }
+
+  if (mode === 'storefront') {
+    if (deliveryZones.length > 0) {
+      const selectedZone = (data.deliveryZone ?? '').trim();
+      if (!selectedZone && !data.province.trim()) {
+        errors.deliveryZone = 'Seleciona a zona de entrega.';
+      }
+    }
+    return errors;
   }
 
   if (!data.province.trim()) {
@@ -78,6 +153,7 @@ export interface DeliveryCalculationOptions {
   freeDeliveryThresholdKz?: number | null;
   defaultDeliveryFeeKz?: number | null;
   neighborhood?: string;
+  deliveryZone?: string;
 }
 
 export function resolveDeliveryFee(
@@ -90,8 +166,9 @@ export function resolveDeliveryFee(
   const normProvince = normalizeSearchText(province);
   const normMunicipality = normalizeSearchText(municipality);
   const normNeighborhood = normalizeSearchText(options?.neighborhood ?? '');
+  const normDeliveryZone = normalizeSearchText(options?.deliveryZone ?? '');
 
-  if (!normProvince) {
+  if (!normProvince && !normDeliveryZone) {
     return {
       known: false,
       amountKz: 0,
@@ -114,6 +191,27 @@ export function resolveDeliveryFee(
   }
 
   if (rules.length > 0) {
+    // 0. Correspondência direta pela zona selecionada
+    if (normDeliveryZone) {
+      const zoneMatch = rules.find((r) => {
+        const labelNorm = normalizeSearchText(getDeliveryRuleLabel(r));
+        const zoneNameNorm = normalizeSearchText(r.zoneName ?? '');
+        return (
+          r.feeKz >= 0 &&
+          ((labelNorm && labelNorm === normDeliveryZone) ||
+            (zoneNameNorm && zoneNameNorm === normDeliveryZone))
+        );
+      });
+      if (zoneMatch) {
+        return {
+          known: true,
+          amountKz: zoneMatch.feeKz,
+          label: zoneMatch.feeKz === 0 ? 'Grátis' : formatKz(zoneMatch.feeKz),
+          estimatedTime: zoneMatch.estimatedTime,
+        };
+      }
+    }
+
     // 1. Correspondência específica por bairro / zona nomeada dentro da província (ou zona global)
     if (normNeighborhood) {
       const neighborhoodMatch = rules.find((r) => {
@@ -153,22 +251,24 @@ export function resolveDeliveryFee(
     }
 
     // 3. Correspondência geral da província (sem município específico)
-    const provinceFallbackMatch = rules.find(
-      (r) =>
-        normalizeSearchText(r.province) === normProvince &&
-        !r.municipality &&
-        !r.neighborhood &&
-        r.feeKz >= 0
-    );
+    if (normProvince) {
+      const provinceFallbackMatch = rules.find(
+        (r) =>
+          normalizeSearchText(r.province) === normProvince &&
+          !r.municipality &&
+          !r.neighborhood &&
+          r.feeKz >= 0
+      );
 
-    if (provinceFallbackMatch) {
-      return {
-        known: true,
-        amountKz: provinceFallbackMatch.feeKz,
-        label:
-          provinceFallbackMatch.feeKz === 0 ? 'Grátis' : formatKz(provinceFallbackMatch.feeKz),
-        estimatedTime: provinceFallbackMatch.estimatedTime,
-      };
+      if (provinceFallbackMatch) {
+        return {
+          known: true,
+          amountKz: provinceFallbackMatch.feeKz,
+          label:
+            provinceFallbackMatch.feeKz === 0 ? 'Grátis' : formatKz(provinceFallbackMatch.feeKz),
+          estimatedTime: provinceFallbackMatch.estimatedTime,
+        };
+      }
     }
   }
 
@@ -221,10 +321,50 @@ export function calculateOrderSummary(
   };
 }
 
+function interpolateTemplateTokens(template: string, variables: Record<string, string>): string {
+  return template.replace(/\{\{?\s*([a-zA-Z0-9_]+)\s*\}?\}/g, (fullMatch, rawKey: string) => {
+    const lowerKey = rawKey.toLowerCase();
+    return Object.prototype.hasOwnProperty.call(variables, lowerKey)
+      ? variables[lowerKey]
+      : fullMatch;
+  });
+}
+
+function hasOrderSpecificTokens(template: string): boolean {
+  return /\{\{?\s*(itens|items|produtos|products|codigo|order_number|order_code|pedido|total)\s*\}?\}/i.test(
+    template
+  );
+}
+
+export function buildWhatsAppContactMessage(
+  brandName = 'Bercali Store',
+  customTemplate?: string | null
+): string {
+  const cleanBrand = brandName.trim() || 'Bercali Store';
+  const trimmedTemplate = customTemplate?.trim() ?? '';
+
+  if (trimmedTemplate && !hasOrderSpecificTokens(trimmedTemplate)) {
+    const hasProductTokens = /\{\{?\s*(produto|product|product_name|preco|price|sku)\s*\}?\}/i.test(
+      trimmedTemplate
+    );
+    if (!hasProductTokens) {
+      return interpolateTemplateTokens(trimmedTemplate, {
+        loja: cleanBrand,
+        store: cleanBrand,
+        store_name: cleanBrand,
+        brand: cleanBrand,
+      });
+    }
+  }
+
+  return `Olá, ${cleanBrand}! Gostaria de receber informações sobre os vossos produtos.`;
+}
+
 export function buildWhatsAppProductInquiryMessage(
   product: Product,
   quantity = 1,
-  brandName = 'Bercali Store'
+  brandName = 'Bercali Store',
+  customTemplate?: string | null
 ): string {
   const cleanBrand = brandName.trim() || 'Bercali Store';
   const skuPart = product.sku ? ` (Ref./SKU: ${product.sku})` : '';
@@ -236,6 +376,36 @@ export function buildWhatsAppProductInquiryMessage(
       `Olá, ${cleanBrand}! Gostaria de saber informações sobre a reposição deste produto:`,
       `• Produto: ${product.name}${skuPart}`,
       `• Preço indicado: ${formatKz(product.price)}`,
+    ].join('\n');
+  }
+
+  const trimmedTemplate = customTemplate?.trim() ?? '';
+  if (trimmedTemplate && !hasOrderSpecificTokens(trimmedTemplate)) {
+    const interpolated = interpolateTemplateTokens(trimmedTemplate, {
+      loja: cleanBrand,
+      store: cleanBrand,
+      store_name: cleanBrand,
+      produto: product.name,
+      product: product.name,
+      product_name: product.name,
+      sku: product.sku ?? '',
+      preco: formatKz(product.price),
+      price: formatKz(product.price),
+      quantidade: String(safeQty),
+      quantity: String(safeQty),
+    });
+
+    if (/\{\{?\s*(produto|product|product_name)\s*\}?\}/i.test(trimmedTemplate)) {
+      return interpolated;
+    }
+
+    return [
+      interpolated,
+      `• Produto: ${product.name}${skuPart}`,
+      `• Preço unitário: ${formatKz(product.price)}`,
+      `• Quantidade pretendida: ${safeQty}`,
+      '',
+      'Podem confirmar a disponibilidade e as condições de entrega?',
     ].join('\n');
   }
 
@@ -253,12 +423,14 @@ export function buildWhatsAppOrderMessage(
   customer: CustomerCheckoutData,
   summary: OrderSummaryCalculation,
   orderNumber?: string,
-  brandName = 'Bercali Store'
+  brandName = 'Bercali Store',
+  customTemplate?: string | null
 ): string {
   const cleanBrand = brandName.trim() || 'Bercali Store';
   const cleanName = customer.fullName.trim();
   const cleanPhone = customer.phone.trim();
   const cleanEmail = (customer.email ?? '').trim();
+  const cleanZone = (customer.deliveryZone ?? '').trim();
   const cleanProvince = customer.province.trim();
   const cleanMunicipality = customer.municipality.trim();
   const cleanNeighborhood = customer.neighborhood.trim();
@@ -283,7 +455,61 @@ export function buildWhatsAppOrderMessage(
       ? formatKz(summary.estimatedTotalKz)
       : `${formatKz(summary.productsSubtotalKz)} (entrega a confirmar)`;
 
-  const headerLines = [`Olá, ${cleanBrand}! Quero fazer uma encomenda.`];
+  const resolvedZoneSummary =
+    cleanZone ||
+    [cleanNeighborhood, cleanMunicipality, cleanProvince].filter(Boolean).join(', ') ||
+    'A confirmar';
+
+  const trimmedTemplate = customTemplate?.trim() ?? '';
+  let introGreeting = `Olá, ${cleanBrand}! Quero fazer uma encomenda.`;
+
+  if (trimmedTemplate) {
+    const interpolated = interpolateTemplateTokens(trimmedTemplate, {
+      loja: cleanBrand,
+      store: cleanBrand,
+      store_name: cleanBrand,
+      codigo: cleanOrderNumber ?? '',
+      order_number: cleanOrderNumber ?? '',
+      order_code: cleanOrderNumber ?? '',
+      pedido: cleanOrderNumber ?? '',
+      cliente: cleanName,
+      nome: cleanName,
+      customer_name: cleanName,
+      telefone: cleanPhone,
+      phone: cleanPhone,
+      customer_phone: cleanPhone,
+      zona: resolvedZoneSummary,
+      delivery_zone: resolvedZoneSummary,
+      endereco: cleanAddress || resolvedZoneSummary,
+      address: cleanAddress || resolvedZoneSummary,
+      itens: productBlocks,
+      items: productBlocks,
+      produtos: productBlocks,
+      products: productBlocks,
+      subtotal: formatKz(summary.productsSubtotalKz),
+      entrega: summary.delivery.label,
+      delivery_fee: summary.delivery.label,
+      total: totalLine,
+      observacoes: cleanNotes,
+      notes: cleanNotes,
+    });
+
+    const hasItemsToken = /\{\{?\s*(itens|items|produtos|products)\s*\}?\}/i.test(trimmedTemplate);
+    const hasTotalToken = /\{\{?\s*total\s*\}?\}/i.test(trimmedTemplate);
+
+    if (hasItemsToken && hasTotalToken) {
+      if (cleanOrderNumber && !interpolated.includes(cleanOrderNumber)) {
+        return `${interpolated}\n\nPedido nº: ${cleanOrderNumber}`;
+      }
+      return interpolated;
+    }
+
+    if (!hasOrderSpecificTokens(trimmedTemplate)) {
+      introGreeting = interpolated;
+    }
+  }
+
+  const headerLines = [introGreeting];
   if (cleanOrderNumber) {
     headerLines.push(`Pedido nº: ${cleanOrderNumber}`);
   }
@@ -296,12 +522,21 @@ export function buildWhatsAppOrderMessage(
   if (cleanEmail) {
     customerLines.push(`E-mail: ${cleanEmail}`);
   }
-  customerLines.push(
-    `Província: ${cleanProvince}`,
-    `Município: ${cleanMunicipality}`,
-    `Bairro: ${cleanNeighborhood}`,
-    `Endereço/referência: ${cleanAddress}`
-  );
+  if (cleanZone && cleanZone !== cleanProvince && cleanZone !== cleanMunicipality) {
+    customerLines.push(`Zona de entrega: ${cleanZone}`);
+  }
+  if (cleanProvince) {
+    customerLines.push(`Província: ${cleanProvince}`);
+  }
+  if (cleanMunicipality) {
+    customerLines.push(`Município: ${cleanMunicipality}`);
+  }
+  if (cleanNeighborhood) {
+    customerLines.push(`Bairro: ${cleanNeighborhood}`);
+  }
+  if (cleanAddress) {
+    customerLines.push(`Endereço/referência: ${cleanAddress}`);
+  }
 
   return [
     ...headerLines,
@@ -324,9 +559,10 @@ export function buildWhatsAppOrderMessage(
 }
 
 export function buildWhatsAppUrl(whatsappNumberConfig: string, message: string): string {
-  const encoded = encodeURIComponent(message);
-  if (isValidWhatsAppNumber(whatsappNumberConfig)) {
-    return `https://wa.me/${whatsappNumberConfig.trim()}?text=${encoded}`;
+  const normalized = normalizeWhatsAppNumber(whatsappNumberConfig);
+  if (!normalized) {
+    return '';
   }
-  return `https://wa.me/?text=${encoded}`;
+  const encoded = encodeURIComponent(message);
+  return `https://wa.me/${normalized}?text=${encoded}`;
 }

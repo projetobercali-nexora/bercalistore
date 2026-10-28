@@ -12,6 +12,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
   const { storeSettings } = useCatalog();
   const hasDeliveryAddress =
     Boolean(customer.fullName.trim()) ||
+    Boolean((customer.deliveryZone ?? '').trim()) ||
     Boolean(customer.province.trim()) ||
     Boolean(customer.municipality.trim());
 
@@ -102,18 +103,20 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
                 <span className="text-[#8A8A8A]">E-mail:</span> {(customer.email ?? '').trim()}
               </p>
             )}
-            {(customer.province.trim() ||
+            {((customer.deliveryZone ?? '').trim() ||
+              customer.province.trim() ||
               customer.municipality.trim() ||
               customer.neighborhood.trim()) && (
               <p>
                 <span className="text-[#8A8A8A]">Zona:</span>{' '}
-                {[
-                  customer.neighborhood.trim(),
-                  customer.municipality.trim(),
-                  customer.province.trim(),
-                ]
-                  .filter(Boolean)
-                  .join(', ')}
+                {(customer.deliveryZone ?? '').trim() ||
+                  [
+                    customer.neighborhood.trim(),
+                    customer.municipality.trim(),
+                    customer.province.trim(),
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
               </p>
             )}
             {customer.addressReference.trim() && (

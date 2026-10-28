@@ -46,11 +46,11 @@ export const PUBLIC_MESSAGES = {
   productNotFound:
     'O artigo que procuras não se encontra disponível de momento ou o endereço não está correto.',
   orderRegistrationTemporaryError:
-    'Estamos com uma dificuldade temporária ao registar automaticamente o pedido. Podes concluir a tua encomenda diretamente pelo WhatsApp.',
+    'Não foi possível registar a tua encomenda neste momento. Por favor, verifica os dados e tenta novamente dentro de alguns instantes.',
   orderRegistrationNetworkError:
-    'Não foi possível registar automaticamente a encomenda neste momento. Verifica a tua ligação à internet ou conclui o envio pelo WhatsApp.',
+    'Não foi possível registar a tua encomenda devido a uma falha de ligação. Verifica a tua internet e tenta novamente.',
   whatsappUnavailableNotice:
-    'O atendimento direto pelo WhatsApp está temporariamente indisponível neste momento. Podes copiar a mensagem do teu pedido abaixo ou tentar novamente mais tarde.',
+    'O atendimento direto pelo WhatsApp não se encontra disponível neste momento. Por favor, tenta novamente mais tarde.',
 } as const;
 
 export type CatalogDiagnosticCategory =

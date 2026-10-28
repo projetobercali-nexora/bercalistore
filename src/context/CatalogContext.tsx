@@ -12,9 +12,16 @@ import { fetchStorefrontCatalog } from '../services/storefrontApi';
 import type {
   DeliveryFeeRule,
   Product,
+  PublicMarketingSettings,
   PublicStoreSettings,
   StoreCategory,
 } from '../types/store';
+import { hasConfiguredWhatsApp } from '../utils/checkout';
+import {
+  createDefaultMarketingSettings,
+  readStoredCookieConsent,
+  syncMetaPixelRuntime,
+} from '../utils/metaPixel';
 import {
   resolveCatalogLoadStatus,
   type CatalogErrorKind,
@@ -30,6 +37,7 @@ interface CatalogContextValue {
   products: Product[];
   categories: StoreCategory[];
   storeSettings: PublicStoreSettings;
+  marketingSettings: PublicMarketingSettings;
   isStoreActive: boolean;
   loading: boolean;
   loadStatus: CatalogLoadStatus;
@@ -38,6 +46,7 @@ interface CatalogContextValue {
   accessNotice: string | null;
   configured: boolean;
   whatsappNumber: string;
+  hasWhatsApp: boolean;
   deliveryFeeRules: DeliveryFeeRule[];
   refreshCatalog: (options?: RefreshCatalogOptions) => Promise<void>;
 }
@@ -51,6 +60,9 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [storeSettings, setStoreSettings] = useState<PublicStoreSettings>(() =>
     createDefaultPublicStoreSettings()
+  );
+  const [marketingSettings, setMarketingSettings] = useState<PublicMarketingSettings>(() =>
+    createDefaultMarketingSettings()
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +101,11 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       hasProductsRef.current = result.products.length > 0;
+      syncMetaPixelRuntime(result.marketingSettings, readStoredCookieConsent());
       setProducts(result.products);
       setCategories(result.categories);
       setStoreSettings(result.storeSettings);
+      setMarketingSettings(result.marketingSettings);
       setError(result.error);
       setErrorKind(result.errorKind);
       setAccessNotice(result.accessNotice);
@@ -112,9 +126,11 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
         lastFetchAtRef.current = Date.now();
         hasLoadedOnceRef.current = true;
         hasProductsRef.current = result.products.length > 0;
+        syncMetaPixelRuntime(result.marketingSettings, readStoredCookieConsent());
         setProducts(result.products);
         setCategories(result.categories);
         setStoreSettings(result.storeSettings);
+        setMarketingSettings(result.marketingSettings);
         setError(result.error);
         setErrorKind(result.errorKind);
         setAccessNotice(result.accessNotice);
@@ -177,6 +193,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
           .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, scheduleRealtimeRefresh)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'product_media' }, scheduleRealtimeRefresh)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'store_settings' }, scheduleRealtimeRefresh)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'marketing_settings' }, scheduleRealtimeRefresh)
           .subscribe()
       : null;
 
@@ -202,11 +219,17 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [loading, errorKind, products.length]
   );
 
+  const hasWhatsApp = useMemo(
+    () => hasConfiguredWhatsApp(storeSettings.whatsappNumber),
+    [storeSettings.whatsappNumber]
+  );
+
   const value = useMemo<CatalogContextValue>(
     () => ({
       products,
       categories,
       storeSettings,
+      marketingSettings,
       isStoreActive: storeSettings.isStoreActive,
       loading,
       loadStatus,
@@ -215,6 +238,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       accessNotice,
       configured: SUPABASE_CONFIG_STATUS.configured,
       whatsappNumber: storeSettings.whatsappNumber,
+      hasWhatsApp,
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       refreshCatalog: loadCatalog,
     }),
@@ -222,11 +246,13 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       products,
       categories,
       storeSettings,
+      marketingSettings,
       loading,
       loadStatus,
       error,
       errorKind,
       accessNotice,
+      hasWhatsApp,
       loadCatalog,
     ]
   );

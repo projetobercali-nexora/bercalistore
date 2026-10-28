@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { CartToast } from './components/CartToast';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { Footer } from './components/Footer';
 import { Header } from './components/Header';
 import { InstallPrompt } from './components/InstallPrompt';
@@ -61,6 +62,7 @@ export function App() {
 
             <Footer />
             <CartToast />
+            <CookieConsentBanner />
             <InstallPrompt />
             <MobileNavigation />
           </div>

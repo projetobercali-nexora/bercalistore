@@ -1,20 +1,42 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Lock, ShoppingBag } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Lock,
+  MessageCircle,
+  ShoppingBag,
+} from 'lucide-react';
 import { CheckoutForm } from '../components/CheckoutForm';
 import { OrderSummary } from '../components/OrderSummary';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
-import { WhatsAppCheckoutButton } from '../components/WhatsAppCheckoutButton';
+import {
+  WhatsAppCheckoutButton,
+  type ConfirmedOrderResult,
+} from '../components/WhatsAppCheckoutButton';
 import { STORE_CONFIG } from '../config/store';
 import { useCart } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
-import type { CheckoutValidationErrors, CustomerCheckoutData } from '../types/store';
+import type {
+  CheckoutValidationErrors,
+  CustomerCheckoutData,
+  DeliveryFeeRule,
+} from '../types/store';
 import { calculateOrderSummary, validateCheckoutForm } from '../utils/checkout';
+import {
+  META_PIXEL_READY_EVENT,
+  trackMetaContact,
+  trackMetaInitiateCheckout,
+} from '../utils/metaPixel';
 
 const INITIAL_CUSTOMER: CustomerCheckoutData = {
   fullName: '',
   phone: '',
   email: '',
+  deliveryZone: '',
   province: '',
   municipality: '',
   neighborhood: '',
@@ -26,25 +48,46 @@ const FIELD_ORDER: (keyof CustomerCheckoutData)[] = [
   'fullName',
   'phone',
   'email',
+  'deliveryZone',
   'province',
   'municipality',
   'neighborhood',
   'addressReference',
 ];
 
+function openExternalLinkInNewTab(url: string): void {
+  if (typeof document === 'undefined' || !url) return;
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 export const CheckoutPage: React.FC = () => {
   const { lines, clearCart } = useCart();
-  const { deliveryFeeRules, storeSettings, isStoreActive } = useCatalog();
+  const { deliveryFeeRules, storeSettings, hasWhatsApp, isStoreActive } = useCatalog();
   const [customer, setCustomer] = useState<CustomerCheckoutData>(INITIAL_CUSTOMER);
   const [touchedSubmit, setTouchedSubmit] = useState(false);
-  const [cartClearedByUser, setCartClearedByUser] = useState(false);
-  const [lastOrderNumber, setLastOrderNumber] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrderResult | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const trackedInitiateCheckoutRef = useRef(false);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
 
   const errors: CheckoutValidationErrors = useMemo(
-    () => (touchedSubmit ? validateCheckoutForm(customer) : {}),
-    [customer, touchedSubmit]
+    () =>
+      touchedSubmit
+        ? validateCheckoutForm(customer, {
+            mode: 'storefront',
+            deliveryZones: deliveryFeeRules,
+          })
+        : {},
+    [customer, deliveryFeeRules, touchedSubmit]
   );
 
   const summary = useMemo(
@@ -58,6 +101,7 @@ export const CheckoutPage: React.FC = () => {
           freeDeliveryThresholdKz: storeSettings.freeDeliveryThresholdKz,
           defaultDeliveryFeeKz: storeSettings.defaultDeliveryFeeKz,
           neighborhood: customer.neighborhood,
+          deliveryZone: customer.deliveryZone,
         }
       ),
     [
@@ -65,19 +109,49 @@ export const CheckoutPage: React.FC = () => {
       customer.province,
       customer.municipality,
       customer.neighborhood,
+      customer.deliveryZone,
       deliveryFeeRules,
       storeSettings.freeDeliveryThresholdKz,
       storeSettings.defaultDeliveryFeeKz,
     ]
   );
 
+  useEffect(() => {
+    if (lines.length === 0 || confirmedOrder) return;
+    const tryTrackInitiateCheckout = () => {
+      if (!trackedInitiateCheckoutRef.current) {
+        if (trackMetaInitiateCheckout(summary)) {
+          trackedInitiateCheckoutRef.current = true;
+        }
+      }
+    };
+    tryTrackInitiateCheckout();
+    window.addEventListener(META_PIXEL_READY_EVENT, tryTrackInitiateCheckout);
+    return () => {
+      window.removeEventListener(META_PIXEL_READY_EVENT, tryTrackInitiateCheckout);
+    };
+  }, [confirmedOrder, lines.length, summary]);
+
   const handleFieldChange = (field: keyof CustomerCheckoutData, value: string) => {
     setCustomer((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSelectDeliveryZone = (zoneLabel: string, matchedRule?: DeliveryFeeRule) => {
+    setCustomer((prev) => ({
+      ...prev,
+      deliveryZone: zoneLabel,
+      province: matchedRule?.province ? matchedRule.province : prev.province,
+      municipality: matchedRule?.municipality ? matchedRule.municipality : prev.municipality,
+      neighborhood: matchedRule?.neighborhood ? matchedRule.neighborhood : prev.neighborhood,
+    }));
+  };
+
   const handleValidationFail = () => {
     setTouchedSubmit(true);
-    const currentErrors = validateCheckoutForm(customer);
+    const currentErrors = validateCheckoutForm(customer, {
+      mode: 'storefront',
+      deliveryZones: deliveryFeeRules,
+    });
     const firstField = FIELD_ORDER.find((field) => Boolean(currentErrors[field]));
     if (firstField) {
       const el = document.getElementById(`checkout-${firstField}`);
@@ -88,37 +162,109 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  const handleConfirmClearCart = (orderNumber?: string) => {
-    if (orderNumber) {
-      setLastOrderNumber(orderNumber);
-    }
+  const handleOrderConfirmed = (result: ConfirmedOrderResult) => {
+    setConfirmedOrder(result);
     clearCart();
-    setCartClearedByUser(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (result.whatsappUrl) {
+      trackMetaContact('Finalizar Compra WhatsApp');
+      openExternalLinkInNewTab(result.whatsappUrl);
+    }
   };
 
-  if (cartClearedByUser) {
+  const handleCopyOrderMessage = async () => {
+    if (!confirmedOrder) return;
+    try {
+      await navigator.clipboard.writeText(confirmedOrder.whatsappMessage);
+      setCopiedSummary(true);
+      window.setTimeout(() => setCopiedSummary(false), 2500);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = confirmedOrder.whatsappMessage;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopiedSummary(true);
+      window.setTimeout(() => setCopiedSummary(false), 2500);
+    }
+  };
+
+  if (confirmedOrder) {
     return (
-      <div className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16">
-        <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-6 sm:p-8 text-center space-y-4">
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-16">
+        <div className="rounded-2xl bg-[#1A1A1A] border border-white/10 p-6 sm:p-8 text-center space-y-5 shadow-xl shadow-black/50">
           <CheckCircle2 className="mx-auto h-12 w-12 text-[#22C55E]" aria-hidden="true" />
-          <h1 className="font-display text-2xl font-extrabold text-white">
-            Carrinho limpo por tua indicação
-          </h1>
-          {lastOrderNumber && (
-            <p className="font-display text-sm font-bold text-[#FFC400] tabular-nums">
-              Referência do pedido: {lastOrderNumber}
+          <div className="space-y-1.5">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+              Encomenda registada com sucesso
+            </h1>
+            <p className="text-sm text-[#8A8A8A]">
+              Guarda o código abaixo para acompanhares o teu pedido junto da {brandName}.
             </p>
-          )}
+          </div>
+
+          <div className="rounded-xl bg-[#0A0A0A] border border-[#FFC400]/40 px-4 py-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[#8A8A8A]">
+              Código do pedido
+            </p>
+            <p
+              data-testid="confirmed-order-code"
+              className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-[#FFC400] tabular-nums"
+            >
+              {confirmedOrder.orderNumber}
+            </p>
+          </div>
+
           <p className="text-sm text-[#8A8A8A] leading-relaxed">
-            Lembra-te de concluir o envio da mensagem na conversa do WhatsApp. A equipa da{' '}
-            {brandName} responderá para confirmar a disponibilidade dos produtos, o valor final e os
-            detalhes da entrega.
+            {confirmedOrder.whatsappUrl
+              ? `Abrimos o WhatsApp da ${brandName} com os produtos, quantidades, total em Kz e o código do teu pedido. Caso a janela não tenha aberto automaticamente, toca no botão abaixo.`
+              : `A tua encomenda ficou registada na ${brandName}. A nossa equipa entrará em contacto através do número indicado para confirmar a entrega.`}
           </p>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-1">
+            {confirmedOrder.whatsappUrl && (
+              <a
+                href={confirmedOrder.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  trackMetaContact('Reabrir Pedido WhatsApp');
+                }}
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-3 font-display text-xs sm:text-sm font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99]"
+              >
+                <MessageCircle className="h-4 w-4 shrink-0" />
+                <span>Enviar no WhatsApp</span>
+                <ExternalLink className="h-4 w-4 shrink-0" />
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={() => void handleCopyOrderMessage()}
+              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0A0A0A] px-5 py-3 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+            >
+              {copiedSummary ? (
+                <>
+                  <Check className="h-4 w-4 text-[#22C55E]" />
+                  <span className="text-[#22C55E]">Resumo copiado</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 text-[#FF8A00]" />
+                  <span>Copiar resumo do pedido</span>
+                </>
+              )}
+            </button>
+          </div>
+
           <div className="pt-2">
             <Link
               to="/"
-              className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-extrabold uppercase text-[#0A0A0A]"
+              className="inline-flex min-h-[44px] items-center justify-center text-xs sm:text-sm font-medium text-[#8A8A8A] hover:text-white transition-colors"
             >
               Voltar à página inicial
             </Link>
@@ -164,10 +310,12 @@ export const CheckoutPage: React.FC = () => {
       <div>
         <SpeedLinesDivider className="mb-2.5" />
         <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
-          Finalizar encomenda pelo WhatsApp
+          {hasWhatsApp ? 'Finalizar encomenda pelo WhatsApp' : 'Finalizar encomenda'}
         </h1>
         <p className="mt-1 text-sm text-[#8A8A8A]">
-          Confirma os teus dados de entrega e revê o resumo antes de abrires o WhatsApp.
+          {hasWhatsApp
+            ? 'Confirma os teus dados e revê o resumo. A encomenda é registada antes de abrir o WhatsApp.'
+            : 'Confirma os teus dados e revê o resumo para registares a tua encomenda.'}
         </p>
       </div>
 
@@ -191,8 +339,8 @@ export const CheckoutPage: React.FC = () => {
           role="alert"
           className="rounded-xl bg-[#1A1A1A] border border-[#EF4444]/60 px-4 py-3 text-xs sm:text-sm text-[#EF4444]"
         >
-          Preenche corretamente todos os campos obrigatórios assinalados antes de registar a
-          encomenda.
+          Preenche corretamente todos os campos obrigatórios assinalados antes de confirmar o
+          pedido.
         </div>
       )}
 
@@ -202,7 +350,9 @@ export const CheckoutPage: React.FC = () => {
             values={customer}
             errors={errors}
             onChange={handleFieldChange}
-            disabled={!isStoreActive}
+            deliveryZones={deliveryFeeRules}
+            onSelectDeliveryZone={handleSelectDeliveryZone}
+            disabled={!isStoreActive || isSubmitting}
           />
         </div>
 
@@ -212,7 +362,8 @@ export const CheckoutPage: React.FC = () => {
             customer={customer}
             summary={summary}
             onValidationFail={handleValidationFail}
-            onConfirmClearCart={handleConfirmClearCart}
+            onOrderConfirmed={handleOrderConfirmed}
+            onSubmittingChange={setIsSubmitting}
           />
         </div>
       </div>

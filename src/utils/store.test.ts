@@ -16,12 +16,18 @@ import {
   sanitizeStoredCart,
   updateCartItemQuantity,
 } from './cart';
+import { WHATSAPP_NUMBER } from '../config/store';
 import {
+  buildWhatsAppContactMessage,
   buildWhatsAppOrderMessage,
+  buildWhatsAppProductInquiryMessage,
   buildWhatsAppUrl,
   calculateOrderSummary,
+  formatInternationalWhatsApp,
+  hasConfiguredWhatsApp,
   hasValidationErrors,
   isValidWhatsAppNumber,
+  normalizeWhatsAppNumber,
   validateCheckoutForm,
 } from './checkout';
 import {
@@ -29,6 +35,7 @@ import {
   attachRelationsToProducts,
   buildStoreCategories,
   buildSupabaseOrderPayloads,
+  extractPublicStoreSettings,
   extractWhatsAppFromSettings,
   isPublishedProductRow,
   mapSupabaseProductToStoreProduct,
@@ -759,5 +766,112 @@ test('verifyAndRecalculateOrder enforces store closure, stock availability, and 
     assert.equal(validCheck.verifiedSummary.estimatedTotalKz, 262500);
   }
 });
+
+test('WhatsApp configuration has no hardcoded phone number and normalizes +244 links cleanly', () => {
+  assert.equal(WHATSAPP_NUMBER, '');
+  assert.equal(hasConfiguredWhatsApp(''), false);
+  assert.equal(buildWhatsAppUrl('', 'Olá'), '');
+  assert.equal(buildWhatsAppUrl('   ', 'Olá'), '');
+
+  assert.equal(normalizeWhatsAppNumber('+244 923 111 222'), '244923111222');
+  assert.equal(normalizeWhatsAppNumber('923 111 222'), '244923111222');
+  assert.equal(normalizeWhatsAppNumber('00244923111222'), '244923111222');
+  assert.equal(formatInternationalWhatsApp('923111222'), '+244923111222');
+
+  const link = buildWhatsAppUrl('+244 923 111 222', 'Olá Bercali');
+  assert.equal(link, 'https://wa.me/244923111222?text=Ol%C3%A1%20Bercali');
+});
+
+test('extractPublicStoreSettings reads WhatsApp number and message templates from store_settings', () => {
+  const emptySettings = extractPublicStoreSettings([]);
+  assert.equal(emptySettings.whatsappNumber, '');
+  assert.equal(emptySettings.whatsappMessageTemplate, null);
+
+  const configured = extractPublicStoreSettings([
+    { setting_key: 'whatsapp_number', setting_value: '923 444 555' },
+    {
+      setting_key: 'whatsapp_message_template',
+      setting_value: 'Olá equipa {{loja}}, preciso de apoio!',
+    },
+    {
+      setting_key: 'whatsapp_order_template',
+      setting_value: 'Novo pedido {{codigo}} para {{loja}}:\n{{itens}}\nTotal: {{total}}',
+    },
+  ]);
+
+  assert.equal(configured.whatsappNumber, '244923444555');
+  assert.equal(
+    buildWhatsAppContactMessage('Bercali Store', configured.whatsappMessageTemplate),
+    'Olá equipa Bercali Store, preciso de apoio!'
+  );
+
+  const productMsg = buildWhatsAppProductInquiryMessage(
+    TEST_CATALOG[0],
+    1,
+    'Bercali Store',
+    'Olá {{loja}}, quero encomendar {{produto}} ({{preco}}).'
+  );
+  assert.ok(productMsg.includes('Carregador Portátil Solar 20.000 mAh'));
+
+  const summary = calculateOrderSummary(
+    [{ product: TEST_CATALOG[0], quantity: 2, lineSubtotal: 49000 }],
+    '',
+    '',
+    []
+  );
+  const orderMsg = buildWhatsAppOrderMessage(
+    {
+      fullName: 'Ana Silva',
+      phone: '923000111',
+      province: '',
+      municipality: '',
+      neighborhood: '',
+      addressReference: '',
+      notes: '',
+    },
+    summary,
+    'BRC-20261028-9999',
+    'Bercali Store',
+    configured.whatsappOrderTemplate
+  );
+  assert.ok(orderMsg.includes('BRC-20261028-9999'));
+  assert.ok(orderMsg.includes('Carregador Portátil Solar 20.000 mAh'));
+  assert.ok(orderMsg.includes('49.000 Kz'));
+});
+
+test('validateCheckoutForm in storefront mode requires name, phone, and zone only when zones exist', () => {
+  const baseCustomer = {
+    fullName: 'Carlos Mateus',
+    phone: '923 123 456',
+    deliveryZone: '',
+    province: '',
+    municipality: '',
+    neighborhood: '',
+    addressReference: '',
+    notes: '',
+  };
+
+  // Sem zonas configuradas: apenas nome e telefone são obrigatórios
+  const noZonesErrors = validateCheckoutForm(baseCustomer, {
+    mode: 'storefront',
+    deliveryZones: [],
+  });
+  assert.equal(hasValidationErrors(noZonesErrors), false);
+
+  // Com zonas configuradas: exige seleção de zona de entrega
+  const zones = [{ zoneName: 'Talatona', province: 'Luanda', feeKz: 2000 }];
+  const missingZoneErrors = validateCheckoutForm(baseCustomer, {
+    mode: 'storefront',
+    deliveryZones: zones,
+  });
+  assert.equal(Boolean(missingZoneErrors.deliveryZone), true);
+
+  const validWithZoneErrors = validateCheckoutForm(
+    { ...baseCustomer, deliveryZone: 'Talatona' },
+    { mode: 'storefront', deliveryZones: zones }
+  );
+  assert.equal(hasValidationErrors(validWithZoneErrors), false);
+});
+
 
 

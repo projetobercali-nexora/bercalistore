@@ -4,12 +4,13 @@ import { Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
 import { useCart } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
-import { buildWhatsAppUrl } from '../utils/checkout';
+import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
+import { trackMetaContact } from '../utils/metaPixel';
 import { BrandLogo } from './BrandLogo';
 
 export const Header: React.FC = () => {
   const { totalItemsCount } = useCart();
-  const { whatsappNumber, storeSettings } = useCatalog();
+  const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -19,10 +20,12 @@ export const Header: React.FC = () => {
   }, [location.pathname, location.search]);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
-  const directWhatsappHref = buildWhatsAppUrl(
-    whatsappNumber,
-    `Olá, ${brandName}! Gostaria de receber informações sobre os vossos produtos.`
-  );
+  const directWhatsappHref = hasWhatsApp
+    ? buildWhatsAppUrl(
+        whatsappNumber,
+        buildWhatsAppContactMessage(brandName, storeSettings.whatsappMessageTemplate)
+      )
+    : '';
 
   const handleSearchAction = () => {
     if (location.pathname === '/' || location.pathname === '/catalogo') {
@@ -70,14 +73,19 @@ export const Header: React.FC = () => {
             <NavLink to="/categorias" className={navLinkClass}>
               Categorias
             </NavLink>
-            <a
-              href={directWhatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whitespace-nowrap shrink-0 text-sm font-medium text-white/85 hover:text-[#FF8A00] transition-colors py-1"
-            >
-              WhatsApp
-            </a>
+            {directWhatsappHref && (
+              <a
+                href={directWhatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  trackMetaContact('Cabeçalho WhatsApp');
+                }}
+                className="whitespace-nowrap shrink-0 text-sm font-medium text-white/85 hover:text-[#FF8A00] transition-colors py-1"
+              >
+                WhatsApp
+              </a>
+            )}
           </nav>
 
           {/* Zona 3: Ações rápidas (Pesquisa nas páginas internas, Carrinho e Menu móvel) */}
@@ -193,17 +201,22 @@ export const Header: React.FC = () => {
             </nav>
 
             <div className="mt-auto pt-5 border-t border-white/10">
-              <a
-                href={directWhatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-bercali-gradient px-4 font-display text-sm font-bold uppercase text-[#0A0A0A]"
-              >
-                <MessageCircle className="h-5 w-5" />
-                Falar no WhatsApp
-              </a>
-              <p className="mt-3 text-center text-xs text-[#8A8A8A]">
-                {STORE_CONFIG.slogan}
+              {directWhatsappHref && (
+                <a
+                  href={directWhatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    trackMetaContact('Menu Móvel WhatsApp');
+                  }}
+                  className="mb-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-bercali-gradient px-4 font-display text-sm font-bold uppercase text-[#0A0A0A]"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Falar no WhatsApp
+                </a>
+              )}
+              <p className="text-center text-xs text-[#8A8A8A]">
+                {storeSettings.slogan || STORE_CONFIG.slogan}
               </p>
             </div>
           </aside>

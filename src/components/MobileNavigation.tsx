@@ -4,19 +4,22 @@ import { Home, LayoutGrid, MessageCircle, Search, ShoppingBag } from 'lucide-rea
 import { STORE_CONFIG } from '../config/store';
 import { useCart } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
-import { buildWhatsAppUrl } from '../utils/checkout';
+import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
+import { trackMetaContact } from '../utils/metaPixel';
 
 export const MobileNavigation: React.FC = () => {
   const { totalItemsCount } = useCart();
-  const { whatsappNumber, storeSettings } = useCatalog();
+  const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const location = useLocation();
   const navigate = useNavigate();
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
-  const whatsappHref = buildWhatsAppUrl(
-    whatsappNumber,
-    `Olá, ${brandName}! Gostaria de receber informações sobre os vossos produtos.`
-  );
+  const whatsappHref = hasWhatsApp
+    ? buildWhatsAppUrl(
+        whatsappNumber,
+        buildWhatsAppContactMessage(brandName, storeSettings.whatsappMessageTemplate)
+      )
+    : '';
 
   const handleMobileSearch = () => {
     if (location.pathname === '/' || location.pathname === '/catalogo') {
@@ -40,7 +43,11 @@ export const MobileNavigation: React.FC = () => {
       aria-label="Navegação rápida móvel"
       className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0A0A0A]/95 backdrop-blur-md border-t border-white/10 pb-safe"
     >
-      <div className="grid h-[60px] grid-cols-5 items-center px-1">
+      <div
+        className={`grid h-[60px] ${
+          whatsappHref ? 'grid-cols-5' : 'grid-cols-4'
+        } items-center px-1`}
+      >
         <NavLink to="/" end className={tabClass}>
           <Home className="h-5 w-5" />
           <span className="truncate max-w-full">Início</span>
@@ -73,16 +80,21 @@ export const MobileNavigation: React.FC = () => {
           <span className="truncate max-w-full">Carrinho</span>
         </NavLink>
 
-        <a
-          href={whatsappHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Contactar Bercali Store pelo WhatsApp"
-          className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#8A8A8A] hover:text-[#22C55E] transition-colors"
-        >
-          <MessageCircle className="h-5 w-5" />
-          <span className="truncate max-w-full">WhatsApp</span>
-        </a>
+        {whatsappHref && (
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              trackMetaContact('Navegação Inferior WhatsApp');
+            }}
+            aria-label={`Contactar ${brandName} pelo WhatsApp`}
+            className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#8A8A8A] hover:text-[#22C55E] transition-colors"
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span className="truncate max-w-full">WhatsApp</span>
+          </a>
+        )}
       </div>
     </nav>
   );

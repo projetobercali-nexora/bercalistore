@@ -9,6 +9,7 @@ import {
   sanitizeStoredCart,
   updateCartItemQuantity,
 } from '../utils/cart';
+import { trackMetaAddToCart } from '../utils/metaPixel';
 
 interface CartFeedback {
   productName: string;
@@ -148,21 +149,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
       let added = false;
+      let addedQty = 0;
       setItems((prev) => {
         const prevQty = prev.find((i) => i.productId === product.id)?.quantity ?? 0;
         const next = addOrIncrementCartItem(prev, product, quantity);
         const nextQty = next.find((i) => i.productId === product.id)?.quantity ?? 0;
         if (nextQty > prevQty) {
           added = true;
+          addedQty = nextQty - prevQty;
           persistItemsSync(next);
         }
         return next;
       });
 
       if (added) {
+        trackMetaAddToCart(product, addedQty || quantity);
         setFeedback({
           productName: product.name,
-          quantityAdded: quantity,
+          quantityAdded: addedQty || quantity,
           timestamp: Date.now(),
         });
         if (timerRef.current !== null) {

@@ -55,6 +55,7 @@ export interface CustomerCheckoutData {
   fullName: string;
   phone: string;
   email?: string;
+  deliveryZone?: string;
   province: string;
   municipality: string;
   neighborhood: string;
@@ -120,6 +121,8 @@ export interface PublicStoreSettings {
   isStoreActive: boolean;
   closedMessage: string;
   whatsappNumber: string;
+  whatsappMessageTemplate: string | null;
+  whatsappOrderTemplate: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -132,6 +135,23 @@ export interface PublicStoreSettings {
   deliveryFeeRules: DeliveryFeeRule[];
   promoBanner: StorePromoBanner | null;
   heroConfig: StoreHeroConfig | null;
+}
+
+export type AllowedMetaPixelEvent =
+  | 'PageView'
+  | 'ViewContent'
+  | 'Search'
+  | 'AddToCart'
+  | 'InitiateCheckout'
+  | 'Contact';
+
+export type MetaPixelEventsConfig = Record<AllowedMetaPixelEvent, boolean>;
+
+export interface PublicMarketingSettings {
+  pixelId: string | null;
+  isEnabled: boolean;
+  consentRequired: boolean;
+  events: MetaPixelEventsConfig;
 }
 
 export type OrderPersistenceStatus =

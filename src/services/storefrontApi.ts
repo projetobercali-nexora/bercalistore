@@ -6,10 +6,15 @@ import type {
   OrderSubmissionResult,
   OrderSummaryCalculation,
   Product,
+  PublicMarketingSettings,
   PublicStoreSettings,
   StoreCategory,
 } from '../types/store';
 import { hasValidationErrors, validateCheckoutForm } from '../utils/checkout';
+import {
+  createDefaultMarketingSettings,
+  extractMarketingSettings,
+} from '../utils/metaPixel';
 import {
   buildCatalogTechnicalDiagnostic,
   classifyCatalogError,
@@ -41,6 +46,7 @@ export interface StorefrontCatalogResponse {
   products: Product[];
   categories: StoreCategory[];
   storeSettings: PublicStoreSettings;
+  marketingSettings: PublicMarketingSettings;
   whatsappNumber: string;
   deliveryFeeRules: DeliveryFeeRule[];
   error: string | null;
@@ -124,6 +130,7 @@ function toPostgrestLikeError(
 
 export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogResponse> {
   const defaultSettings = createDefaultPublicStoreSettings();
+  const defaultMarketingSettings = createDefaultMarketingSettings();
   const browserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
 
   if (!supabase || !SUPABASE_CONFIG_STATUS.configured) {
@@ -150,6 +157,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       products: [],
       categories: [],
       storeSettings: defaultSettings,
+      marketingSettings: defaultMarketingSettings,
       whatsappNumber: defaultSettings.whatsappNumber,
       deliveryFeeRules: defaultSettings.deliveryFeeRules,
       error: classified.userMessage,
@@ -159,7 +167,23 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
   }
 
   try {
-    let [categoriesRes, productsRes, mediaRes, settingsRes] = await Promise.all([
+    const safeSettingsQuery = Promise.resolve(
+      supabase.from('store_settings').select('*')
+    ).catch(() => ({
+      data: null,
+      error: { code: 'SETTINGS_FETCH_FAILED', message: 'Falha ao ler store_settings' },
+      status: 0,
+    }));
+
+    const safeMarketingQuery = Promise.resolve(
+      supabase.from('marketing_settings').select('*')
+    ).catch(() => ({
+      data: null,
+      error: { code: 'MARKETING_FETCH_FAILED', message: 'Falha ao ler marketing_settings' },
+      status: 0,
+    }));
+
+    let [categoriesRes, productsRes, mediaRes, settingsRes, marketingRes] = await Promise.all([
       supabase
         .from('categories')
         .select(CATEGORIES_COLUMNS)
@@ -172,7 +196,8 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         .from('product_media')
         .select(PRODUCT_MEDIA_COLUMNS)
         .order('sort_order', { ascending: true }),
-      supabase.from('store_settings').select('setting_key, setting_value'),
+      safeSettingsQuery,
+      safeMarketingQuery,
     ]);
 
     // Fallback resiliente: se alguma coluna opcional não existir no esquema atual, repete com select('*')
@@ -234,12 +259,39 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         })
       );
     }
+    if (marketingRes.error && typeof console !== 'undefined') {
+      console.warn(
+        '[Bercali Store · Diagnóstico Catálogo]',
+        buildCatalogTechnicalDiagnostic({
+          configured: true,
+          table: 'public.marketing_settings',
+          supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
+          postgrestError: toPostgrestLikeError(marketingRes.error, marketingRes.status),
+        })
+      );
+    }
 
-    const rawSettings =
-      !settingsRes.error && Array.isArray(settingsRes.data)
-        ? (settingsRes.data as unknown as SupabaseStoreSettingRow[])
-        : [];
-    const storeSettings = extractPublicStoreSettings(rawSettings, SUPABASE_PUBLIC_URL);
+    let storeSettings = defaultSettings;
+    try {
+      const rawSettings =
+        !settingsRes.error && Array.isArray(settingsRes.data)
+          ? (settingsRes.data as unknown as SupabaseStoreSettingRow[])
+          : [];
+      storeSettings = extractPublicStoreSettings(rawSettings, SUPABASE_PUBLIC_URL);
+    } catch {
+      storeSettings = defaultSettings;
+    }
+
+    let marketingSettings = defaultMarketingSettings;
+    try {
+      const rawMarketing =
+        !marketingRes.error && Array.isArray(marketingRes.data)
+          ? (marketingRes.data as unknown as Record<string, unknown>[])
+          : [];
+      marketingSettings = extractMarketingSettings(rawMarketing);
+    } catch {
+      marketingSettings = defaultMarketingSettings;
+    }
 
     if (productsRes.error) {
       const pgError = toPostgrestLikeError(productsRes.error, productsRes.status);
@@ -264,6 +316,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         products: [],
         categories: [],
         storeSettings,
+        marketingSettings,
         whatsappNumber: storeSettings.whatsappNumber,
         deliveryFeeRules: storeSettings.deliveryFeeRules,
         error: classified.userMessage,
@@ -289,6 +342,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         products: [],
         categories: [],
         storeSettings,
+        marketingSettings,
         whatsappNumber: storeSettings.whatsappNumber,
         deliveryFeeRules: storeSettings.deliveryFeeRules,
         error: PUBLIC_MESSAGES.catalogTemporaryError,
@@ -405,6 +459,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       products: finalProducts,
       categories: finalCategories,
       storeSettings,
+      marketingSettings,
       whatsappNumber: storeSettings.whatsappNumber,
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       error: null,
@@ -434,6 +489,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
       products: [],
       categories: [],
       storeSettings: defaultSettings,
+      marketingSettings: defaultMarketingSettings,
       whatsappNumber: defaultSettings.whatsappNumber,
       deliveryFeeRules: defaultSettings.deliveryFeeRules,
       error: classified.userMessage,
@@ -463,6 +519,7 @@ function buildSubmissionIdempotencyKey(
     orderNumber.trim(),
     customer.fullName.trim().toLowerCase(),
     customer.phone.replace(/\D/g, ''),
+    (customer.deliveryZone ?? '').trim().toLowerCase(),
     customer.province.trim().toLowerCase(),
     customer.municipality.trim().toLowerCase(),
     customer.neighborhood.trim().toLowerCase(),
@@ -470,14 +527,49 @@ function buildSubmissionIdempotencyKey(
   ].join('::');
 }
 
+function extractRpcResultDetails(
+  rpcData: unknown,
+  fallbackOrderNumber: string,
+  fallbackOrderId: string
+): { orderNumber: string; orderId: string } {
+  if (typeof rpcData === 'string' && rpcData.trim()) {
+    const trimmed = rpcData.trim();
+    // Se a função devolver um código legível (ex.: BRC-... ou ORD-...), usa-o como orderNumber
+    if (/^[A-Z]{2,5}-/i.test(trimmed)) {
+      return { orderNumber: trimmed, orderId: fallbackOrderId };
+    }
+    return { orderNumber: fallbackOrderNumber, orderId: trimmed };
+  }
+
+  const candidateObj = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : rpcData;
+  if (typeof candidateObj === 'object' && candidateObj !== null) {
+    const rec = candidateObj as Record<string, unknown>;
+    const returnedCode =
+      typeof rec.order_number === 'string' && rec.order_number.trim()
+        ? rec.order_number.trim()
+        : typeof rec.order_code === 'string' && rec.order_code.trim()
+        ? rec.order_code.trim()
+        : typeof rec.code === 'string' && rec.code.trim()
+        ? rec.code.trim()
+        : fallbackOrderNumber;
+    const returnedId =
+      typeof rec.order_id === 'string' && rec.order_id.trim()
+        ? rec.order_id.trim()
+        : typeof rec.id === 'string' && rec.id.trim()
+        ? rec.id.trim()
+        : fallbackOrderId;
+    return { orderNumber: returnedCode, orderId: returnedId };
+  }
+
+  return { orderNumber: fallbackOrderNumber, orderId: fallbackOrderId };
+}
+
 /**
- * Grava a encomenda no mesmo projeto Supabase do Painel Administrativo com segurança reforçada:
+ * Grava a encomenda na base de dados usando a função RPC `create_storefront_order`:
  * 1. Bloqueia duplicações por cliques repetidos (idempotência em voo e concluída).
- * 2. Revalida em tempo real o estado ativo/inativo da loja em `store_settings` antes de aceitar o registo.
- * 3. Recalcula preços unitários, stock, disponibilidade e taxas de entrega diretamente a partir dos dados
- *    oficiais atuais do Supabase, sem confiar nos preços enviados pelo navegador.
- * 4. Executa preferencialmente a função transacional `create_storefront_order` (que valida novamente na BD)
- *    com fallback seguro para inserção direta (`return=minimal`), nunca expondo encomendas ou dados de terceiros.
+ * 2. Revalida em tempo real o estado ativo/inativo da loja em `store_settings` e o stock/preço oficial.
+ * 3. Executa a função RPC `create_storefront_order` com a chave pública `anon` e só confirma sucesso
+ *    quando a gravação na base de dados terminar sem erro.
  */
 export async function submitOrderToSupabase(
   customer: CustomerCheckoutData,
@@ -486,13 +578,13 @@ export async function submitOrderToSupabase(
 ): Promise<OrderSubmissionResult> {
   const orderNumber = pregeneratedOrderNumber?.trim() || generateOrderNumber();
 
-  const validationErrors = validateCheckoutForm(customer);
-  if (hasValidationErrors(validationErrors) || summary.lines.length === 0) {
+  const initialValidationErrors = validateCheckoutForm(customer, { mode: 'storefront' });
+  if (hasValidationErrors(initialValidationErrors) || summary.lines.length === 0) {
     return {
       ok: false,
       status: 'error',
       orderNumber,
-      errorMessage: 'Verifica os dados obrigatórios do cliente e os artigos do carrinho.',
+      errorMessage: 'Verifica o teu nome, número de telefone e os artigos do carrinho.',
     };
   }
 
@@ -531,10 +623,18 @@ export async function submitOrderToSupabase(
     try {
       const productIds = Array.from(new Set(requestedItems.map((i) => i.productId)));
 
+      const safeSettingsQuery = Promise.resolve(
+        supabase.from('store_settings').select('*')
+      ).catch(() => ({
+        data: null,
+        error: { code: 'SETTINGS_FETCH_FAILED', message: 'Falha ao ler store_settings' },
+        status: 0,
+      }));
+
       // 1. Revalidação autoritativa do estado da loja, stock e preços reais no Supabase
       let [liveProductsRes, liveSettingsRes] = await Promise.all([
         supabase.from('products').select(PRODUCTS_COLUMNS).in('id', productIds),
-        supabase.from('store_settings').select('setting_key, setting_value'),
+        safeSettingsQuery,
       ]);
 
       if (liveProductsRes.error && isMissingColumnOrSchemaCacheError(liveProductsRes.error)) {
@@ -567,9 +667,10 @@ export async function submitOrderToSupabase(
       }
 
       const liveProducts = (liveProductsRes.data ?? []) as unknown as SupabaseProductRow[];
-      const liveSettings = liveSettingsRes.error
-        ? []
-        : ((liveSettingsRes.data ?? []) as unknown as SupabaseStoreSettingRow[]);
+      const liveSettings =
+        !liveSettingsRes.error && Array.isArray(liveSettingsRes.data)
+          ? (liveSettingsRes.data as unknown as SupabaseStoreSettingRow[])
+          : [];
 
       const verification = verifyAndRecalculateOrder({
         requestedItems,
@@ -588,6 +689,19 @@ export async function submitOrderToSupabase(
         };
       }
 
+      const zoneErrors = validateCheckoutForm(customer, {
+        mode: 'storefront',
+        deliveryZones: verification.storeSettings.deliveryFeeRules,
+      });
+      if (hasValidationErrors(zoneErrors)) {
+        return {
+          ok: false,
+          status: 'error',
+          orderNumber,
+          errorMessage: zoneErrors.deliveryZone ?? 'Seleciona a zona de entrega antes de confirmar.',
+        };
+      }
+
       const verifiedSummary = verification.verifiedSummary;
       const customerId = generateUuid();
       const orderId = generateUuid();
@@ -599,7 +713,16 @@ export async function submitOrderToSupabase(
         summary: verifiedSummary,
       });
 
-      // 2. Tentativa transacional atómica via RPC `create_storefront_order`
+      const rpcItems = orderItemRows.map((item) => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        product_sku: item.product_sku,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        line_total: item.line_total,
+      }));
+
+      // 2. Gravação transacional atómica via RPC `create_storefront_order`
       const baseRpcArgs = {
         p_order_number: orderRow.order_number,
         p_full_name: customerRow.full_name,
@@ -613,14 +736,7 @@ export async function submitOrderToSupabase(
         p_discount_amount: orderRow.discount_amount,
         p_total_amount: orderRow.total_amount,
         p_currency: orderRow.currency,
-        p_items: orderItemRows.map((item) => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
-          product_sku: item.product_sku,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          line_total: item.line_total,
-        })),
+        p_items: rpcItems,
       };
 
       let rpcRes = await supabase.rpc('create_storefront_order', {
@@ -628,238 +744,87 @@ export async function submitOrderToSupabase(
         p_email: customerRow.email,
       });
 
-      // Compatibilidade caso a função RPC existente tenha sido criada sem o parâmetro opcional `p_email`
+      // Compatibilidade caso a função RPC tenha sido criada sem `p_email` ou com assinatura compacta do painel
       if (rpcRes.error && isMissingRpcError(rpcRes.error)) {
         rpcRes = await supabase.rpc('create_storefront_order', baseRpcArgs);
       }
 
+      if (rpcRes.error && isMissingRpcError(rpcRes.error)) {
+        const zoneText = (customer.deliveryZone ?? '').trim() || customerRow.city || null;
+        rpcRes = await supabase.rpc('create_storefront_order', {
+          p_customer_name: customerRow.full_name,
+          p_customer_phone: customerRow.phone,
+          p_delivery_zone: zoneText,
+          p_delivery_address: orderRow.delivery_address,
+          p_notes: customerRow.notes,
+          p_delivery_fee: orderRow.delivery_fee,
+          p_items: rpcItems,
+        });
+      }
+
       if (!rpcRes.error) {
-        const rpcData = rpcRes.data;
-        const returnedOrderId =
-          typeof rpcData === 'string' && rpcData.trim()
-            ? rpcData.trim()
-            : typeof rpcData === 'object' &&
-              rpcData !== null &&
-              typeof (rpcData as Record<string, unknown>).order_id === 'string'
-            ? ((rpcData as Record<string, unknown>).order_id as string)
-            : orderId;
+        const resolved = extractRpcResultDetails(rpcRes.data, orderNumber, orderId);
 
         const successResult: OrderSubmissionResult = {
           ok: true,
           status: 'saved',
-          orderNumber,
-          orderId: returnedOrderId,
+          orderNumber: resolved.orderNumber,
+          orderId: resolved.orderId,
           verifiedSummary,
         };
         completedOrderSubmissions.set(idempotencyKey, successResult);
         return successResult;
       }
 
-      if (!isMissingRpcError(rpcRes.error)) {
-        const errMsg = rpcRes.error.message ?? '';
-        if (errMsg.includes('LOJA_ENCERRADA')) {
-          return {
-            ok: false,
-            status: 'store_closed',
-            orderNumber,
-            errorCode: rpcRes.error.code,
-            errorMessage:
-              errMsg.replace(/^LOJA_ENCERRADA:\s*/i, '').trim() ||
-              verification.storeSettings.closedMessage,
-          };
-        }
-        if (errMsg.includes('STOCK_INSUFICIENTE') || errMsg.includes('PRODUTO_INDISPONIVEL')) {
-          return {
-            ok: false,
-            status: 'stock_conflict',
-            orderNumber,
-            errorCode: rpcRes.error.code,
-            errorMessage: errMsg
-              .replace(/^(STOCK_INSUFICIENTE|PRODUTO_INDISPONIVEL):\s*/i, '')
-              .trim(),
-          };
-        }
-        if (rpcRes.error.code === '42501') {
-          if (typeof console !== 'undefined') {
-            console.error(
-              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente na função create_storefront_order:',
-              rpcRes.error
-            );
-          }
-          return {
-            ok: false,
-            status: 'rls_blocked',
-            orderNumber,
-            errorCode: '42501',
-            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-          };
-        }
-        if (typeof console !== 'undefined') {
-          console.error('[Bercali Store · Diagnóstico Encomenda] Erro RPC:', rpcRes.error);
-        }
+      const errMsg = rpcRes.error.message ?? '';
+      if (errMsg.includes('LOJA_ENCERRADA')) {
         return {
           ok: false,
-          status: 'error',
+          status: 'store_closed',
           orderNumber,
           errorCode: rpcRes.error.code,
-          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
+          errorMessage:
+            errMsg.replace(/^LOJA_ENCERRADA:\s*/i, '').trim() ||
+            verification.storeSettings.closedMessage,
         };
       }
-
-      // 3. Fallback de inserção direta nas tabelas reais (sem .select() para respeitar privacidade de clientes/encomendas)
-      let effectiveCustomerId: string | null = customerId;
-      let customerInsert = await supabase.from('customers').insert(customerRow);
-
-      if (customerInsert.error?.code === '23514' || customerInsert.error?.code === '42703') {
-        customerInsert = await supabase.from('customers').insert({
-          id: customerRow.id,
-          full_name: customerRow.full_name,
-          phone: customerRow.phone,
-          city: customerRow.city,
-          notes: customerRow.notes,
-        });
+      if (errMsg.includes('STOCK_INSUFICIENTE') || errMsg.includes('PRODUTO_INDISPONIVEL')) {
+        return {
+          ok: false,
+          status: 'stock_conflict',
+          orderNumber,
+          errorCode: rpcRes.error.code,
+          errorMessage: errMsg
+            .replace(/^(STOCK_INSUFICIENTE|PRODUTO_INDISPONIVEL):\s*/i, '')
+            .trim(),
+        };
       }
-
-      if (customerInsert.error) {
-        if (customerInsert.error.code === '42501') {
-          if (typeof console !== 'undefined') {
-            console.error(
-              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em customers:',
-              customerInsert.error
-            );
-          }
-          return {
-            ok: false,
-            status: 'rls_blocked',
-            orderNumber,
-            errorCode: '42501',
-            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-          };
-        }
-        if (customerInsert.error.code === '23505') {
-          effectiveCustomerId = null;
-        } else {
-          if (typeof console !== 'undefined') {
-            console.error(
-              '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em customers:',
-              customerInsert.error
-            );
-          }
-          return {
-            ok: false,
-            status: 'error',
-            orderNumber,
-            errorCode: customerInsert.error.code,
-            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-          };
-        }
-      }
-
-      const orderPayloadWithCustomer = {
-        ...orderRow,
-        customer_id: effectiveCustomerId,
-      };
-
-      let orderInsert = await supabase.from('orders').insert(orderPayloadWithCustomer);
-
-      if (orderInsert.error?.code === '23514') {
-        orderInsert = await supabase.from('orders').insert({
-          id: orderRow.id,
-          order_number: orderRow.order_number,
-          customer_id: effectiveCustomerId,
-          delivery_address: orderRow.delivery_address,
-          internal_notes: orderRow.internal_notes,
-          subtotal: orderRow.subtotal,
-          delivery_fee: orderRow.delivery_fee,
-          discount_amount: orderRow.discount_amount,
-          total_amount: orderRow.total_amount,
-        });
-      }
-
-      if (orderInsert.error) {
-        if (orderInsert.error.code === '42501') {
-          if (typeof console !== 'undefined') {
-            console.error(
-              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em orders:',
-              orderInsert.error
-            );
-          }
-          return {
-            ok: false,
-            status: 'rls_blocked',
-            orderNumber,
-            errorCode: '42501',
-            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-          };
-        }
-        if (orderInsert.error.code === '23505') {
-          const dedupResult: OrderSubmissionResult = {
-            ok: true,
-            status: 'saved',
-            orderNumber,
-            orderId,
-            verifiedSummary,
-          };
-          completedOrderSubmissions.set(idempotencyKey, dedupResult);
-          return dedupResult;
-        }
+      if (rpcRes.error.code === '42501') {
         if (typeof console !== 'undefined') {
           console.error(
-            '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em orders:',
-            orderInsert.error
+            '[Bercali Store · Diagnóstico Encomenda] Permissão pendente na função create_storefront_order:',
+            rpcRes.error
           );
         }
         return {
           ok: false,
-          status: 'error',
+          status: 'rls_blocked',
           orderNumber,
-          errorCode: orderInsert.error.code,
+          errorCode: '42501',
           errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
         };
       }
 
-      const itemsInsert = await supabase.from('order_items').insert(orderItemRows);
-
-      if (itemsInsert.error) {
-        if (itemsInsert.error.code === '42501') {
-          if (typeof console !== 'undefined') {
-            console.error(
-              '[Bercali Store · Diagnóstico Encomenda] Permissão pendente ao inserir em order_items:',
-              itemsInsert.error
-            );
-          }
-          return {
-            ok: false,
-            status: 'rls_blocked',
-            orderNumber,
-            errorCode: '42501',
-            errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-          };
-        }
-        if (typeof console !== 'undefined') {
-          console.error(
-            '[Bercali Store · Diagnóstico Encomenda] Erro ao inserir em order_items:',
-            itemsInsert.error
-          );
-        }
-        return {
-          ok: false,
-          status: 'error',
-          orderNumber,
-          errorCode: itemsInsert.error.code,
-          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-        };
+      if (typeof console !== 'undefined') {
+        console.error('[Bercali Store · Diagnóstico Encomenda] Erro RPC:', rpcRes.error);
       }
-
-      const savedResult: OrderSubmissionResult = {
-        ok: true,
-        status: 'saved',
+      return {
+        ok: false,
+        status: 'error',
         orderNumber,
-        orderId,
-        verifiedSummary,
+        errorCode: rpcRes.error.code,
+        errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
       };
-      completedOrderSubmissions.set(idempotencyKey, savedResult);
-      return savedResult;
     } catch (thrownError) {
       if (typeof console !== 'undefined') {
         console.error(

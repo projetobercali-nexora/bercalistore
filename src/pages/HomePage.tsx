@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check,
@@ -28,7 +28,7 @@ import {
   getNewProducts,
   getPromotionalProducts,
 } from '../utils/catalog';
-import { buildWhatsAppUrl } from '../utils/checkout';
+import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import {
   calculateDiscountPercent,
   formatKz,
@@ -37,6 +37,7 @@ import {
   isProductPurchasable,
   slugifyCategory,
 } from '../utils/format';
+import { trackMetaContact, trackMetaSearch } from '../utils/metaPixel';
 import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 type CatalogTab = 'all' | 'new' | 'promos';
@@ -178,12 +179,31 @@ export const HomePage: React.FC = () => {
     loading,
     error,
     whatsappNumber,
+    hasWhatsApp,
     refreshCatalog,
   } = useCatalog();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState<CatalogTab>('all');
   const [heroImgFailed, setHeroImgFailed] = useState(false);
+  const lastTrackedSearchRef = useRef<string>('');
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      if (!trimmed) {
+        lastTrackedSearchRef.current = '';
+      }
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      if (lastTrackedSearchRef.current !== trimmed) {
+        lastTrackedSearchRef.current = trimmed;
+        trackMetaSearch(trimmed);
+      }
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   const featuredProducts = useMemo(() => getFeaturedProducts(products), [products]);
   const promotionalProducts = useMemo(() => getPromotionalProducts(products), [products]);
@@ -236,10 +256,12 @@ export const HomePage: React.FC = () => {
   };
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
-  const whatsappDirectUrl = buildWhatsAppUrl(
-    whatsappNumber,
-    `Olá, ${brandName}! Gostaria de receber informações sobre os vossos produtos.`
-  );
+  const whatsappDirectUrl = hasWhatsApp
+    ? buildWhatsAppUrl(
+        whatsappNumber,
+        buildWhatsAppContactMessage(brandName, storeSettings.whatsappMessageTemplate)
+      )
+    : '';
 
   const heroConfig = storeSettings.heroConfig;
   const customHeroBannerUrl =
@@ -259,6 +281,11 @@ export const HomePage: React.FC = () => {
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
+          const trimmed = searchQuery.trim();
+          if (trimmed && lastTrackedSearchRef.current !== trimmed) {
+            lastTrackedSearchRef.current = trimmed;
+            trackMetaSearch(trimmed);
+          }
           scrollToCatalog();
         }}
         className="relative flex w-full items-center rounded-2xl bg-[#161616] border-2 border-[#FF8A00]/85 focus-within:border-[#FFC400] shadow-md shadow-black/40 transition-colors"
@@ -314,7 +341,9 @@ export const HomePage: React.FC = () => {
       {/* 3. Atalhos em cartões pequenos numa linha com scroll horizontal */}
       <nav
         aria-label="Atalhos rápidos da loja"
-        className="flex items-center gap-2.5 overflow-x-auto pb-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className={`flex items-center gap-2.5 overflow-x-auto pb-0.5 -mx-3.5 px-3.5 sm:mx-0 sm:px-0 sm:grid ${
+          whatsappDirectUrl ? 'sm:grid-cols-4' : 'sm:grid-cols-3'
+        } sm:gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       >
         <Link
           to="/categorias"
@@ -358,17 +387,22 @@ export const HomePage: React.FC = () => {
           <span className="font-display text-xs sm:text-sm font-bold">Novidades</span>
         </button>
 
-        <a
-          href={whatsappDirectUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[#161616] border border-white/10 px-3.5 py-2 shadow-sm shadow-black/30 hover:border-[#22C55E]/60 transition-colors whitespace-nowrap"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#22C55E]/15 text-[#22C55E]">
-            <MessageCircle className="h-4 w-4" />
-          </span>
-          <span className="font-display text-xs sm:text-sm font-bold text-white">WhatsApp</span>
-        </a>
+        {whatsappDirectUrl && (
+          <a
+            href={whatsappDirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              trackMetaContact('Atalho Início WhatsApp');
+            }}
+            className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[#161616] border border-white/10 px-3.5 py-2 shadow-sm shadow-black/30 hover:border-[#22C55E]/60 transition-colors whitespace-nowrap"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#22C55E]/15 text-[#22C55E]">
+              <MessageCircle className="h-4 w-4" />
+            </span>
+            <span className="font-display text-xs sm:text-sm font-bold text-white">WhatsApp</span>
+          </a>
+        )}
       </nav>
 
       {/* 4. Faixa de benefícios compacta */}

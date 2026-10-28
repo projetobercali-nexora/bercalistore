@@ -18,6 +18,7 @@ import {
   calculateOrderSummary,
   isValidEmailAddress,
   isValidWhatsAppNumber,
+  normalizeWhatsAppNumber,
 } from './checkout';
 import { isProductPurchasable, slugifyCategory } from './format';
 
@@ -82,8 +83,9 @@ export interface SupabaseProductRow {
 }
 
 export interface SupabaseStoreSettingRow {
-  setting_key: string;
-  setting_value: unknown;
+  setting_key?: string;
+  setting_value?: unknown;
+  [key: string]: unknown;
 }
 
 export interface SupabaseCustomerInsert {
@@ -198,6 +200,8 @@ export function createDefaultPublicStoreSettings(): PublicStoreSettings {
     isStoreActive: true,
     closedMessage: DEFAULT_CLOSED_STORE_MESSAGE,
     whatsappNumber: WHATSAPP_NUMBER,
+    whatsappMessageTemplate: null,
+    whatsappOrderTemplate: null,
     phone: null,
     email: null,
     address: null,
@@ -550,19 +554,8 @@ export function buildStoreCategories(
 }
 
 function normalizePhoneCandidate(raw: unknown): string | null {
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    return normalizePhoneCandidate(String(Math.trunc(raw)));
-  }
-  if (typeof raw !== 'string') return null;
-  const digits = raw.replace(/\D/g, '');
-  if (!digits) return null;
-  if (digits.length === 9 && digits.startsWith('9')) {
-    return `244${digits}`;
-  }
-  if (isValidWhatsAppNumber(digits)) {
-    return digits;
-  }
-  return null;
+  const normalized = normalizeWhatsAppNumber(raw);
+  return normalized.length > 0 ? normalized : null;
 }
 
 function normalizeDisplayPhone(raw: unknown): string | null {
@@ -718,7 +711,7 @@ export function extractPublicStoreSettings(
   supabaseUrl?: string
 ): PublicStoreSettings {
   const result = createDefaultPublicStoreSettings();
-  let explicitWhatsappFound = false;
+  let explicitWhatsappState: 'unset' | 'set' | 'cleared' = 'unset';
 
   const applySocialRecord = (obj: Record<string, unknown>) => {
     const ig = normalizeSocialUrl(
@@ -827,16 +820,62 @@ export function extractPublicStoreSettings(
       result.closedMessage = closedMsg;
     }
 
-    // Contactos: WhatsApp, Telefone, E-mail e Morada
+    // Contactos: WhatsApp, Modelo de Mensagem, Telefone, E-mail e Morada
+    const whatsappFields = [
+      obj.whatsapp,
+      obj.whatsapp_number,
+      obj.whatsappNumber,
+      obj.store_whatsapp,
+      obj.support_whatsapp,
+      obj.contact_whatsapp,
+      obj.whatsapp_phone,
+    ];
+    const hasExplicitWaField = whatsappFields.some((v) => v !== undefined);
     const waCandidate =
       normalizePhoneCandidate(obj.whatsapp) ??
       normalizePhoneCandidate(obj.whatsapp_number) ??
       normalizePhoneCandidate(obj.whatsappNumber) ??
       normalizePhoneCandidate(obj.store_whatsapp) ??
-      normalizePhoneCandidate(obj.support_whatsapp);
+      normalizePhoneCandidate(obj.support_whatsapp) ??
+      normalizePhoneCandidate(obj.contact_whatsapp) ??
+      normalizePhoneCandidate(obj.whatsapp_phone);
+
     if (waCandidate) {
       result.whatsappNumber = waCandidate;
-      explicitWhatsappFound = true;
+      explicitWhatsappState = 'set';
+    } else if (hasExplicitWaField && explicitWhatsappState !== 'set') {
+      result.whatsappNumber = '';
+      explicitWhatsappState = 'cleared';
+    }
+
+    const msgTemplateCandidate =
+      toCleanString(obj.whatsapp_message_template) ??
+      toCleanString(obj.whatsappMessageTemplate) ??
+      toCleanString(obj.whatsapp_template) ??
+      toCleanString(obj.whatsappTemplate) ??
+      toCleanString(obj.whatsapp_message) ??
+      toCleanString(obj.whatsappMessage) ??
+      toCleanString(obj.default_whatsapp_message) ??
+      toCleanString(obj.whatsapp_greeting) ??
+      (groupKey === 'whatsapp' || groupKey === 'whatsapp_settings'
+        ? toCleanString(obj.message ?? obj.template ?? obj.greeting)
+        : null);
+    if (msgTemplateCandidate) {
+      result.whatsappMessageTemplate = msgTemplateCandidate;
+    }
+
+    const orderTemplateCandidate =
+      toCleanString(obj.whatsapp_order_template) ??
+      toCleanString(obj.whatsappOrderTemplate) ??
+      toCleanString(obj.order_whatsapp_template) ??
+      toCleanString(obj.checkout_whatsapp_template) ??
+      toCleanString(obj.order_message_template) ??
+      toCleanString(obj.whatsapp_checkout_message) ??
+      (groupKey === 'whatsapp' || groupKey === 'whatsapp_settings' || groupKey === 'checkout'
+        ? toCleanString(obj.order_template ?? obj.checkout_template)
+        : null);
+    if (orderTemplateCandidate) {
+      result.whatsappOrderTemplate = orderTemplateCandidate;
     }
 
     const phoneDisplay =
@@ -846,7 +885,7 @@ export function extractPublicStoreSettings(
       normalizeDisplayPhone(obj.store_phone);
     if (phoneDisplay) {
       result.phone = phoneDisplay;
-      if (!explicitWhatsappFound) {
+      if (explicitWhatsappState === 'unset') {
         const fallbackWa = normalizePhoneCandidate(phoneDisplay);
         if (fallbackWa) {
           result.whatsappNumber = fallbackWa;
@@ -994,7 +1033,23 @@ export function extractPublicStoreSettings(
   };
 
   for (const row of rows) {
-    const key = row.setting_key?.trim().toLowerCase() ?? '';
+    if (typeof row !== 'object' || row === null) continue;
+
+    // Suporte para tabelas `store_settings` com colunas diretas (sem `setting_key`)
+    if (typeof row.setting_key !== 'string') {
+      const sanitizedFlatRow: Record<string, unknown> = {};
+      for (const [colKey, colVal] of Object.entries(row)) {
+        const lk = colKey.toLowerCase();
+        if (lk.includes('pixel') || lk.includes('secret') || lk.includes('token')) {
+          continue;
+        }
+        sanitizedFlatRow[colKey] = colVal;
+      }
+      applyObjectSettings(sanitizedFlatRow, 'general');
+      continue;
+    }
+
+    const key = row.setting_key.trim().toLowerCase();
     if (!key) continue;
 
     // Ignorar explicitamente chaves internas/marketing privadas
@@ -1012,7 +1067,9 @@ export function extractPublicStoreSettings(
         (key === 'whatsapp' ||
           key === 'whatsapp_number' ||
           key === 'store_whatsapp' ||
-          key === 'support_whatsapp') &&
+          key === 'support_whatsapp' ||
+          key === 'contact_whatsapp' ||
+          key === 'whatsapp_phone') &&
         (obj.value !== undefined || obj.number !== undefined || obj.phone !== undefined)
       ) {
         const wa =
@@ -1022,7 +1079,43 @@ export function extractPublicStoreSettings(
           normalizePhoneCandidate(obj.value);
         if (wa) {
           result.whatsappNumber = wa;
-          explicitWhatsappFound = true;
+          explicitWhatsappState = 'set';
+        } else if (explicitWhatsappState !== 'set') {
+          result.whatsappNumber = '';
+          explicitWhatsappState = 'cleared';
+        }
+        if (obj.message !== undefined || obj.template !== undefined) {
+          const tpl = toCleanString(obj.template ?? obj.message);
+          if (tpl) result.whatsappMessageTemplate = tpl;
+        }
+        continue;
+      }
+
+      if (
+        (key === 'whatsapp_message' ||
+          key === 'whatsapp_message_template' ||
+          key === 'whatsapp_template' ||
+          key === 'default_whatsapp_message' ||
+          key === 'whatsapp_greeting') &&
+        (obj.value !== undefined || obj.template !== undefined || obj.message !== undefined)
+      ) {
+        const tpl = toCleanString(obj.template ?? obj.message ?? obj.value);
+        if (tpl) {
+          result.whatsappMessageTemplate = tpl;
+        }
+        continue;
+      }
+
+      if (
+        (key === 'whatsapp_order_template' ||
+          key === 'order_whatsapp_template' ||
+          key === 'checkout_whatsapp_template' ||
+          key === 'order_message_template') &&
+        (obj.value !== undefined || obj.template !== undefined || obj.message !== undefined)
+      ) {
+        const tpl = toCleanString(obj.template ?? obj.message ?? obj.value);
+        if (tpl) {
+          result.whatsappOrderTemplate = tpl;
         }
         continue;
       }
@@ -1119,12 +1212,36 @@ export function extractPublicStoreSettings(
       case 'whatsapp':
       case 'whatsapp_number':
       case 'store_whatsapp':
-      case 'support_whatsapp': {
+      case 'support_whatsapp':
+      case 'contact_whatsapp':
+      case 'whatsapp_phone': {
         const wa = normalizePhoneCandidate(val);
         if (wa) {
           result.whatsappNumber = wa;
-          explicitWhatsappFound = true;
+          explicitWhatsappState = 'set';
+        } else if (explicitWhatsappState !== 'set') {
+          result.whatsappNumber = '';
+          explicitWhatsappState = 'cleared';
         }
+        break;
+      }
+      case 'whatsapp_message':
+      case 'whatsapp_message_template':
+      case 'whatsapp_template':
+      case 'default_whatsapp_message':
+      case 'whatsapp_greeting':
+      case 'message_template': {
+        const s = toCleanString(val);
+        if (s) result.whatsappMessageTemplate = s;
+        break;
+      }
+      case 'whatsapp_order_template':
+      case 'order_whatsapp_template':
+      case 'checkout_whatsapp_template':
+      case 'order_message_template':
+      case 'whatsapp_checkout_message': {
+        const s = toCleanString(val);
+        if (s) result.whatsappOrderTemplate = s;
         break;
       }
       case 'phone':
@@ -1133,7 +1250,7 @@ export function extractPublicStoreSettings(
         const ph = normalizeDisplayPhone(val);
         if (ph) {
           result.phone = ph;
-          if (!explicitWhatsappFound) {
+          if (explicitWhatsappState === 'unset') {
             const wa = normalizePhoneCandidate(ph);
             if (wa) result.whatsappNumber = wa;
           }
@@ -1351,6 +1468,7 @@ export function verifyAndRecalculateOrder(params: {
       freeDeliveryThresholdKz: storeSettings.freeDeliveryThresholdKz,
       defaultDeliveryFeeKz: storeSettings.defaultDeliveryFeeKz,
       neighborhood: customer.neighborhood,
+      deliveryZone: customer.deliveryZone,
     }
   );
 
@@ -1381,12 +1499,29 @@ export function generateOrderNumber(now = new Date()): string {
 }
 
 export function formatOrderDeliveryAddress(customer: CustomerCheckoutData): string {
-  return [
-    `Província: ${customer.province.trim()}`,
-    `Município: ${customer.municipality.trim()}`,
-    `Bairro: ${customer.neighborhood.trim()}`,
-    `Endereço/Referência: ${customer.addressReference.trim()}`,
-  ].join(' | ');
+  const cleanZone = (customer.deliveryZone ?? '').trim();
+  const cleanProv = customer.province.trim();
+  const cleanMun = customer.municipality.trim();
+  const cleanNeigh = customer.neighborhood.trim();
+  const cleanRef = customer.addressReference.trim();
+
+  const parts: string[] = [];
+  if (cleanZone && cleanZone !== cleanProv && cleanZone !== cleanMun) {
+    parts.push(`Zona: ${cleanZone}`);
+  }
+  if (cleanProv) {
+    parts.push(`Província: ${cleanProv}`);
+  }
+  if (cleanMun) {
+    parts.push(`Município: ${cleanMun}`);
+  }
+  if (cleanNeigh) {
+    parts.push(`Bairro: ${cleanNeigh}`);
+  }
+  if (cleanRef) {
+    parts.push(`Endereço/Referência: ${cleanRef}`);
+  }
+  return parts.length > 0 ? parts.join(' | ') : 'A confirmar pelo WhatsApp';
 }
 
 export function formatOrderInternalNotes(
@@ -1420,13 +1555,17 @@ export function buildSupabaseOrderPayloads(params: {
 } {
   const { customerId, orderId, orderNumber, customer, summary } = params;
   const cleanEmail = (customer.email ?? '').trim();
+  const cityStr =
+    [customer.municipality.trim(), customer.province.trim()].filter(Boolean).join(', ') ||
+    (customer.deliveryZone ?? '').trim() ||
+    'Angola';
 
   const customerRow: SupabaseCustomerInsert = {
     id: customerId,
     full_name: customer.fullName.trim(),
     phone: customer.phone.trim(),
     email: cleanEmail && isValidEmailAddress(cleanEmail) ? cleanEmail : null,
-    city: `${customer.municipality.trim()}, ${customer.province.trim()}`,
+    city: cityStr,
     notes: customer.notes.trim() ? customer.notes.trim() : null,
     source: 'online_store',
   };

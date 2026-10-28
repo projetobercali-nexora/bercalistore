@@ -14,8 +14,9 @@ import {
 import { STORE_CONFIG } from '../config/store';
 import { useCatalog } from '../context/CatalogContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { buildWhatsAppUrl } from '../utils/checkout';
+import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { formatKz } from '../utils/format';
+import { trackMetaContact } from '../utils/metaPixel';
 import { formatInstallOutcomeFeedback } from '../utils/pwa';
 import { BrandLogo } from './BrandLogo';
 import { PWAInstallModal } from './PWAInstallModal';
@@ -23,7 +24,7 @@ import { SpeedLinesDivider } from './SpeedLinesDivider';
 
 export const Footer: React.FC = () => {
   const location = useLocation();
-  const { storeSettings, whatsappNumber } = useCatalog();
+  const { storeSettings, whatsappNumber, hasWhatsApp } = useCatalog();
   const {
     isInstalled,
     isInstallableNatively,
@@ -37,8 +38,8 @@ export const Footer: React.FC = () => {
   const outcomeRef = useRef<HTMLDivElement | null>(null);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
-  const greeting = `Olá, ${brandName}! Gostaria de receber informações sobre os vossos produtos.`;
-  const whatsappHref = buildWhatsAppUrl(whatsappNumber, greeting);
+  const greeting = buildWhatsAppContactMessage(brandName, storeSettings.whatsappMessageTemplate);
+  const whatsappHref = hasWhatsApp ? buildWhatsAppUrl(whatsappNumber, greeting) : '';
 
   const socialEntries = [
     { key: 'instagram', label: 'Instagram', url: storeSettings.socialLinks.instagram },
@@ -259,15 +260,20 @@ export const Footer: React.FC = () => {
             </p>
 
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#FF8A00] px-4 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors whitespace-nowrap"
-              >
-                <MessageCircle className="h-4 w-4 shrink-0" />
-                <span>Falar no WhatsApp</span>
-              </a>
+              {whatsappHref && (
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    trackMetaContact('Rodapé WhatsApp');
+                  }}
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#FF8A00] px-4 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors whitespace-nowrap"
+                >
+                  <MessageCircle className="h-4 w-4 shrink-0" />
+                  <span>Falar no WhatsApp</span>
+                </a>
+              )}
 
               {isInstalled ? (
                 <span

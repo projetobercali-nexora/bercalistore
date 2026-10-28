@@ -3,11 +3,10 @@ import type { DeliveryFeeRule } from '../types/store';
 /**
  * CONFIGURAÇÃO CENTRAL DO WHATSAPP — BERCALI STORE
  *
- * Substitui "SUBSTITUIR_PELO_NUMERO_OFICIAL" pelo número oficial da loja no formato
- * internacional exigido pelo WhatsApp: apenas algarismos, incluindo o indicativo de Angola (244),
- * sem "+", sem espaços e sem hífenes. Exemplo: "244923000000".
+ * O número oficial e o modelo de mensagem do WhatsApp são lidos dinamicamente de `store_settings`
+ * no Supabase (Painel Administrativo). Nunca colocar números fixos no código.
  */
-export const WHATSAPP_NUMBER = 'SUBSTITUIR_PELO_NUMERO_OFICIAL';
+export const WHATSAPP_NUMBER = '';
 
 /**
  * Caminho estático do logotipo oficial original da Bercali Store.

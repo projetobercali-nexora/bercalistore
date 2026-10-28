@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -29,6 +29,11 @@ import {
   isProductPurchasable,
   slugifyCategory,
 } from '../utils/format';
+import {
+  META_PIXEL_READY_EVENT,
+  trackMetaContact,
+  trackMetaViewContent,
+} from '../utils/metaPixel';
 import { PUBLIC_MESSAGES } from '../utils/publicMessages';
 
 export const ProductDetailPage: React.FC = () => {
@@ -41,6 +46,7 @@ export const ProductDetailPage: React.FC = () => {
     isStoreActive,
     storeSettings,
     whatsappNumber,
+    hasWhatsApp,
     refreshCatalog,
   } = useCatalog();
   const { addItem, getQuantityInCart } = useCart();
@@ -51,12 +57,29 @@ export const ProductDetailPage: React.FC = () => {
   );
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
+  const lastViewedProductIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setQuantity(1);
     setAddedFeedback(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [slug]);
+
+  useEffect(() => {
+    if (!product) return;
+    const tryTrackViewContent = () => {
+      if (lastViewedProductIdRef.current !== product.id) {
+        if (trackMetaViewContent(product)) {
+          lastViewedProductIdRef.current = product.id;
+        }
+      }
+    };
+    tryTrackViewContent();
+    window.addEventListener(META_PIXEL_READY_EVENT, tryTrackViewContent);
+    return () => {
+      window.removeEventListener(META_PIXEL_READY_EVENT, tryTrackViewContent);
+    };
+  }, [product]);
 
   const relatedProducts = useMemo(
     () => (product ? getRelatedProducts(products, product, 4) : []),
@@ -155,9 +178,12 @@ export const ProductDetailPage: React.FC = () => {
   const whatsappProductMessage = buildWhatsAppProductInquiryMessage(
     product,
     quantity,
-    brandName
+    brandName,
+    storeSettings.whatsappMessageTemplate
   );
-  const whatsappProductHref = buildWhatsAppUrl(whatsappNumber, whatsappProductMessage);
+  const whatsappProductHref = hasWhatsApp
+    ? buildWhatsAppUrl(whatsappNumber, whatsappProductMessage)
+    : '';
 
   const isLowStock =
     purchasable &&
@@ -315,15 +341,20 @@ export const ProductDetailPage: React.FC = () => {
                 </div>
               </div>
 
-              <a
-                href={whatsappProductHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
-              >
-                <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
-                <span>Falar no WhatsApp sobre este produto</span>
-              </a>
+              {whatsappProductHref && (
+                <a
+                  href={whatsappProductHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    trackMetaContact(product.name);
+                  }}
+                  className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
+                  <span>Falar no WhatsApp sobre este produto</span>
+                </a>
+              )}
             </div>
           ) : purchasable ? (
             <div className="space-y-3.5 border-t border-white/10 pt-4">
@@ -402,15 +433,20 @@ export const ProductDetailPage: React.FC = () => {
                 </button>
               </div>
 
-              <a
-                href={whatsappProductHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
-              >
-                <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
-                <span>Perguntar sobre este produto no WhatsApp</span>
-              </a>
+              {whatsappProductHref && (
+                <a
+                  href={whatsappProductHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    trackMetaContact(product.name);
+                  }}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
+                  <span>Perguntar sobre este produto no WhatsApp</span>
+                </a>
+              )}
             </div>
           ) : (
             <div className="space-y-3 border-t border-white/10 pt-4">
@@ -419,15 +455,20 @@ export const ProductDetailPage: React.FC = () => {
                 <strong className="text-white">{statusLabel.toLowerCase()}</strong> de momento e não
                 pode ser adicionado ao carrinho.
               </div>
-              <a
-                href={whatsappProductHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
-              >
-                <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
-                <span>Pedir informação de reposição no WhatsApp</span>
-              </a>
+              {whatsappProductHref && (
+                <a
+                  href={whatsappProductHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    trackMetaContact(product.name);
+                  }}
+                  className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                >
+                  <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
+                  <span>Pedir informação de reposição no WhatsApp</span>
+                </a>
+              )}
             </div>
           )}
 
