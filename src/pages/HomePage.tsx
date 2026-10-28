@@ -72,11 +72,11 @@ const HomeProductCard: React.FC<HomeProductCardProps> = ({ product }) => {
   };
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md shadow-black/40 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md shadow-black/40 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
       <Link
         to={`/produto/${product.slug}`}
         aria-label={`Ver detalhes de ${product.name}`}
-        className="relative block aspect-[4/3] w-full overflow-hidden bg-[#101010]"
+        className="relative flex h-44 sm:h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-[#1D1D1F] p-2"
       >
         {mainImage ? (
           <img
@@ -87,10 +87,10 @@ const HomeProductCard: React.FC<HomeProductCardProps> = ({ product }) => {
             loading="lazy"
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center bg-[#101010]">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center">
             <ImageOff className="h-6 w-6 text-[#8A8A8A]" aria-hidden="true" />
             <span className="text-[11px] font-medium text-[#8A8A8A]">Sem fotografia</span>
           </div>
@@ -100,18 +100,6 @@ const HomeProductCard: React.FC<HomeProductCardProps> = ({ product }) => {
           <span className="absolute top-2 left-2 rounded-lg bg-[#FFC400] px-2 py-0.5 font-display text-[11px] font-extrabold text-[#0A0A0A] shadow-sm tabular-nums">
             -{discountPct}%
           </span>
-        )}
-
-        {!purchasable && (
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2.5 pt-5 pb-1.5">
-            <span
-              className={`block text-[10px] sm:text-[11px] font-semibold leading-tight truncate ${
-                status === 'temporarily_unavailable' ? 'text-[#FFC400]' : 'text-[#EF4444]'
-              }`}
-            >
-              {statusLabel}
-            </span>
-          </div>
         )}
       </Link>
 

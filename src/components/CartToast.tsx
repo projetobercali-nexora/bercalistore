@@ -1,18 +1,23 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
 export const CartToast: React.FC = () => {
   const { feedback, dismissFeedback } = useCart();
+  const location = useLocation();
 
   if (!feedback) return null;
+
+  const isProductDetail = location.pathname.startsWith('/produto/');
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:w-96 z-40 rounded-xl bg-[#1A1A1A] border border-[#22C55E]/50 p-3.5 shadow-2xl"
+      className={`fixed ${
+        isProductDetail ? 'bottom-[132px] md:bottom-20' : 'bottom-20 md:bottom-6'
+      } right-4 left-4 sm:left-auto sm:w-96 z-40 rounded-xl bg-[#1A1A1A] border border-[#22C55E]/50 p-3.5 shadow-2xl`}
     >
       <div className="flex items-start gap-3">
         <CheckCircle2 className="h-5 w-5 shrink-0 text-[#22C55E] mt-0.5" aria-hidden="true" />

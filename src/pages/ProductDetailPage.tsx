@@ -68,20 +68,21 @@ export const ProductDetailPage: React.FC = () => {
       <div
         role="status"
         aria-label="A carregar detalhes do produto"
-        className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8 animate-pulse"
+        className="mx-auto max-w-7xl lg:px-8 lg:py-6 pb-24 animate-pulse"
       >
-        <div className="h-8 w-28 rounded-lg bg-[#1A1A1A]" />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-          <div className="lg:col-span-6 aspect-[4/3] w-full rounded-xl bg-[#1A1A1A] border border-white/10" />
-          <div className="lg:col-span-6 rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-7 space-y-5">
-            <div className="h-4 w-40 rounded bg-white/10" />
-            <div className="h-8 w-3/4 rounded bg-white/15" />
+        <div className="px-3.5 sm:px-6 lg:px-0 py-2">
+          <div className="h-7 w-24 rounded-lg bg-[#1A1A1A]" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-10 items-start">
+          <div className="lg:col-span-6 h-[310px] sm:h-[400px] lg:h-[460px] w-full bg-[#161618] lg:rounded-2xl" />
+          <div className="lg:col-span-6 px-3.5 sm:px-6 lg:p-7 lg:rounded-2xl lg:bg-[#161616] lg:border lg:border-white/10 space-y-3">
+            <div className="h-7 w-3/4 rounded bg-white/15" />
             <div className="h-8 w-36 rounded bg-[#FFC400]/25" />
-            <div className="space-y-2">
+            <div className="h-4 w-48 rounded bg-white/10" />
+            <div className="space-y-2 pt-2">
               <div className="h-4 w-full rounded bg-white/10" />
               <div className="h-4 w-5/6 rounded bg-white/10" />
             </div>
-            <div className="h-12 w-full rounded-xl bg-[#FF8A00]/20" />
           </div>
         </div>
       </div>
@@ -194,9 +195,9 @@ export const ProductDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-12">
-      {/* Navegação fácil de retorno */}
-      <div className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-7xl pb-24 md:pb-24 lg:px-8 lg:pt-5">
+      {/* Navegação compacta de retorno colada à galeria */}
+      <div className="flex items-center justify-between gap-4 px-3.5 sm:px-6 lg:px-0 py-1.5 lg:pb-3">
         <button
           type="button"
           onClick={() => {
@@ -206,7 +207,7 @@ export const ProductDetailPage: React.FC = () => {
               navigate('/catalogo');
             }
           }}
-          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-[#8A8A8A] hover:text-[#FF8A00] transition-colors cursor-pointer"
+          className="inline-flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-white/85 hover:text-[#FF8A00] transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Voltar</span>
@@ -214,89 +215,94 @@ export const ProductDetailPage: React.FC = () => {
 
         <Link
           to={`/categoria/${categoryTargetSlug}`}
-          className="text-xs font-medium text-[#8A8A8A] hover:text-white transition-colors"
+          className="text-xs font-medium text-[#8A8A8A] hover:text-white transition-colors truncate"
         >
           {product.category}
         </Link>
       </div>
 
-      {/* Módulo principal: Galeria multimédia + Informação de compra contígua */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+      {/* Módulo principal: Galeria largura total + Informação essencial imediata */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-10 items-start">
         <div className="lg:col-span-6">
           <ProductGallery product={product} />
         </div>
 
-        <div className="lg:col-span-6 rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-7 space-y-5">
-          {/* Categoria, SKU e disponibilidade */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-            <span className="text-[#8A8A8A]">{product.category}</span>
-            {product.sku && (
-              <>
-                <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
-                <span className="text-[#8A8A8A] tabular-nums">SKU: {product.sku}</span>
-              </>
-            )}
-            <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
-            <span
-              className={
-                status === 'available'
-                  ? 'font-semibold text-[#22C55E]'
-                  : status === 'temporarily_unavailable'
-                  ? 'font-semibold text-[#FFC400]'
-                  : 'font-semibold text-[#EF4444]'
-              }
-            >
-              {statusLabel}
-            </span>
-            {purchasable && product.manageStock !== false && typeof product.stock === 'number' && (
-              <>
-                <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
-                <span
-                  className={`tabular-nums ${
-                    isLowStock ? 'font-medium text-[#FFC400]' : 'text-[#8A8A8A]'
-                  }`}
-                >
-                  {isLowStock
-                    ? `Últimas ${product.stock} un. em stock`
-                    : `Stock disponível: ${product.stock} un.`}
-                </span>
-              </>
-            )}
-          </div>
+        <div className="lg:col-span-6 px-3.5 sm:px-6 lg:p-7 lg:rounded-2xl lg:bg-[#161616] lg:border lg:border-white/10 space-y-4">
+          {/* Bloco essencial imediato logo abaixo da galeria: Nome, Preço, Disponibilidade e Stock */}
+          <div className="space-y-1.5">
+            <h1 className="font-display text-xl sm:text-2xl lg:text-3xl font-extrabold leading-snug text-white">
+              {product.name}
+            </h1>
 
-          {/* Nome do produto */}
-          <h1 className="font-display text-2xl sm:text-3xl font-extrabold leading-tight text-white">
-            {product.name}
-          </h1>
+            <div className="flex flex-wrap items-baseline gap-2.5 pt-0.5">
+              <span className="font-display text-2xl sm:text-3xl font-extrabold text-[#FFC400] tabular-nums">
+                {formatKz(product.price)}
+              </span>
+              {discountPct !== null && typeof product.oldPrice === 'number' && (
+                <>
+                  <span className="font-display text-sm sm:text-base font-semibold text-[#8A8A8A] line-through tabular-nums">
+                    {formatKz(product.oldPrice)}
+                  </span>
+                  <span className="font-display text-xs font-extrabold text-[#FF8A00] tabular-nums">
+                    -{discountPct}%
+                  </span>
+                </>
+              )}
+            </div>
 
-          {/* Preço atual e preço anterior (se promoção real) */}
-          <div className="flex flex-wrap items-baseline gap-3 pt-1">
-            <span className="font-display text-2xl sm:text-3xl font-extrabold text-[#FFC400] tabular-nums">
-              {formatKz(product.price)}
-            </span>
-            {discountPct !== null && typeof product.oldPrice === 'number' && (
-              <>
-                <span className="font-display text-base font-semibold text-[#8A8A8A] line-through tabular-nums">
-                  {formatKz(product.oldPrice)}
-                </span>
-                <span className="font-display text-xs font-extrabold text-[#FF8A00] tabular-nums">
-                  (-{discountPct}%)
-                </span>
-              </>
-            )}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-xs">
+              <span
+                className={
+                  status === 'available'
+                    ? 'font-semibold text-[#22C55E]'
+                    : status === 'temporarily_unavailable'
+                    ? 'font-semibold text-[#FFC400]'
+                    : 'font-semibold text-[#EF4444]'
+                }
+              >
+                {statusLabel}
+              </span>
+
+              {purchasable && product.manageStock !== false && typeof product.stock === 'number' && (
+                <>
+                  <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
+                  <span
+                    className={`tabular-nums ${
+                      isLowStock ? 'font-medium text-[#FFC400]' : 'text-white/80'
+                    }`}
+                  >
+                    {isLowStock
+                      ? `Últimas ${product.stock} un. em stock`
+                      : `Stock disponível: ${product.stock} un.`}
+                  </span>
+                </>
+              )}
+
+              <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
+              <span className="text-[#8A8A8A]">{product.category}</span>
+
+              {product.sku && (
+                <>
+                  <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
+                  <span className="text-[#8A8A8A] tabular-nums">SKU: {product.sku}</span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Descrição */}
-          <p className="text-sm sm:text-base text-white/85 leading-relaxed whitespace-pre-line">
-            {product.description}
-          </p>
+          {product.description && (
+            <p className="border-t border-white/10 pt-3.5 text-sm sm:text-base text-white/85 leading-relaxed whitespace-pre-line">
+              {product.description}
+            </p>
+          )}
 
           {/* Seletor de quantidade + Botões de compra / aviso de loja encerrada */}
           {!isStoreActive ? (
-            <div className="space-y-3 border-t border-white/10 pt-5">
+            <div className="space-y-3 border-t border-white/10 pt-4">
               <div
                 role="alert"
-                className="flex items-start gap-2.5 rounded-xl bg-[#0A0A0A] border border-[#FFC400]/40 p-4 text-sm text-white/90"
+                className="flex items-start gap-2.5 rounded-xl bg-[#141414] border border-[#FFC400]/40 p-4 text-sm text-white/90"
               >
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#FFC400]" aria-hidden="true" />
                 <div>
@@ -313,17 +319,17 @@ export const ProductDetailPage: React.FC = () => {
                 href={whatsappProductHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0A0A0A] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
               >
                 <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
                 <span>Falar no WhatsApp sobre este produto</span>
               </a>
             </div>
           ) : purchasable ? (
-            <div className="space-y-4 border-t border-white/10 pt-5">
+            <div className="space-y-3.5 border-t border-white/10 pt-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <span className="text-sm font-medium text-white">Quantidade pretendida</span>
-                <div className="inline-flex items-center rounded-xl bg-[#0A0A0A] border border-white/15">
+                <div className="inline-flex items-center rounded-xl bg-[#141414] border border-white/15">
                   <button
                     type="button"
                     onClick={handleDecrease}
@@ -363,7 +369,7 @@ export const ProductDetailPage: React.FC = () => {
                   type="button"
                   onClick={handleAddToCart}
                   disabled={remainingAddable <= 0}
-                  className={`inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl border px-4 py-3 font-display text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap transition-colors ${
+                  className={`inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border px-4 py-3 font-display text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap transition-colors ${
                     remainingAddable <= 0
                       ? 'border-white/10 bg-white/5 text-[#8A8A8A] cursor-not-allowed'
                       : addedFeedback
@@ -389,7 +395,7 @@ export const ProductDetailPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleBuyNow}
-                  className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-4 py-3 font-display text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer whitespace-nowrap"
+                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-4 py-3 font-display text-xs sm:text-sm font-extrabold uppercase tracking-wide text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer whitespace-nowrap"
                 >
                   <Zap className="h-4 w-4 shrink-0" />
                   <span>COMPRAR AGORA</span>
@@ -400,15 +406,15 @@ export const ProductDetailPage: React.FC = () => {
                 href={whatsappProductHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0A0A0A] px-4 py-2.5 text-xs sm:text-sm font-medium text-white/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
               >
                 <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
                 <span>Perguntar sobre este produto no WhatsApp</span>
               </a>
             </div>
           ) : (
-            <div className="space-y-3 border-t border-white/10 pt-5">
-              <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-4 text-sm text-[#8A8A8A]">
+            <div className="space-y-3 border-t border-white/10 pt-4">
+              <div className="rounded-xl bg-[#141414] border border-white/10 p-4 text-sm text-[#8A8A8A]">
                 Este artigo encontra-se{' '}
                 <strong className="text-white">{statusLabel.toLowerCase()}</strong> de momento e não
                 pode ser adicionado ao carrinho.
@@ -417,7 +423,7 @@ export const ProductDetailPage: React.FC = () => {
                 href={whatsappProductHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0A0A0A] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+                className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#141414] px-4 py-2.5 text-xs sm:text-sm font-medium text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
               >
                 <MessageCircle className="h-4 w-4 text-[#FF8A00]" />
                 <span>Pedir informação de reposição no WhatsApp</span>
@@ -427,7 +433,7 @@ export const ProductDetailPage: React.FC = () => {
 
           {/* Características técnicas (se preenchidas) */}
           {product.features.length > 0 && (
-            <div className="border-t border-white/10 pt-5">
+            <div className="border-t border-white/10 pt-4">
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-white">
                 Características técnicas
               </h2>
@@ -449,7 +455,10 @@ export const ProductDetailPage: React.FC = () => {
 
       {/* Produtos relacionados */}
       {relatedProducts.length > 0 && (
-        <section aria-labelledby="heading-related" className="space-y-5 pt-4 border-t border-white/10">
+        <section
+          aria-labelledby="heading-related"
+          className="mt-8 space-y-5 border-t border-white/10 px-3.5 sm:px-6 lg:px-0 pt-6"
+        >
           <div>
             <SpeedLinesDivider className="mb-2.5" />
             <h2 id="heading-related" className="font-display text-xl sm:text-2xl font-bold text-white">
@@ -459,6 +468,58 @@ export const ProductDetailPage: React.FC = () => {
           <ProductGrid products={relatedProducts} />
         </section>
       )}
+
+      {/* Barra fixa no fundo (acima da navegação inferior no telemóvel) sempre visível ao fazer scroll */}
+      <div
+        aria-label="Barra rápida de compra"
+        className="fixed left-0 right-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px))] md:bottom-0 z-30 border-t border-white/15 bg-[#121212]/95 backdrop-blur-md shadow-[0_-8px_24px_rgba(0,0,0,0.65)]"
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3.5 sm:px-6 lg:px-8 py-2.5">
+          <div className="min-w-0 flex flex-col">
+            {discountPct !== null && typeof product.oldPrice === 'number' ? (
+              <span className="font-display text-[11px] font-medium text-[#8A8A8A] line-through tabular-nums truncate">
+                {formatKz(product.oldPrice)}
+              </span>
+            ) : (
+              <span className="text-[11px] text-[#8A8A8A] leading-tight">Preço</span>
+            )}
+            <span className="font-display text-lg sm:text-xl font-extrabold text-[#FFC400] leading-tight tabular-nums truncate">
+              {formatKz(product.price)}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={!canOrderNow || remainingAddable <= 0}
+            className={`inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl px-4 sm:px-6 py-2.5 font-display text-xs sm:text-sm font-extrabold uppercase tracking-wide whitespace-nowrap transition-all ${
+              !canOrderNow || remainingAddable <= 0
+                ? 'bg-white/10 text-[#8A8A8A] cursor-not-allowed'
+                : addedFeedback
+                ? 'bg-[#22C55E] text-[#0A0A0A] shadow-md cursor-pointer'
+                : 'bg-bercali-gradient text-[#0A0A0A] shadow-md shadow-[#FF8A00]/20 hover:brightness-105 active:scale-[0.98] cursor-pointer'
+            }`}
+          >
+            {!isStoreActive ? (
+              <span>Loja encerrada</span>
+            ) : !purchasable ? (
+              <span>{status === 'out_of_stock' ? 'Sem stock' : 'Indisponível'}</span>
+            ) : remainingAddable <= 0 ? (
+              <span>Stock máx. no carrinho</span>
+            ) : addedFeedback ? (
+              <>
+                <Check className="h-4 w-4 shrink-0" />
+                <span>Adicionado</span>
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="h-4 w-4 shrink-0" />
+                <span>Adicionar ao carrinho</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
