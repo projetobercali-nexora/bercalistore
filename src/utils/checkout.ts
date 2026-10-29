@@ -68,6 +68,111 @@ export function hasConfiguredWhatsApp(raw: unknown): boolean {
   return normalizeWhatsAppNumber(raw).length > 0;
 }
 
+export interface OfficialWhatsAppResolution {
+  hasOfficialFields: boolean;
+  digits: string;
+  source: 'officialWhatsAppNormalized' | 'officialWhatsApp' | null;
+  invalidReason: string | null;
+}
+
+function toRawPhoneString(val: unknown): string {
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'number' && Number.isFinite(val) && val > 0) {
+    return String(Math.trunc(val));
+  }
+  return '';
+}
+
+function parseDigitsForOfficialWhatsApp(raw: string): string {
+  if (!raw || raw === 'SUBSTITUIR_PELO_NUMERO_OFICIAL') {
+    return '';
+  }
+  let digits = raw.replace(/\D/g, '');
+  if (!digits || /^0+$/.test(digits)) {
+    return '';
+  }
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 9 && digits.startsWith('9')) {
+    digits = `244${digits}`;
+  }
+  return /^\d{8,15}$/.test(digits) && !/^0+$/.test(digits) ? digits : '';
+}
+
+/**
+ * Lê de `store_settings > company_profile` primeiro `officialWhatsAppNormalized` (ex.: "+244958427080")
+ * e, se estiver vazio, usa `officialWhatsApp` (apenas dígitos; se tiver 9 dígitos e começar por 9, junta "244").
+ */
+export function resolveOfficialWhatsAppFromCompanyProfile(
+  companyProfile: Record<string, unknown> | null | undefined
+): OfficialWhatsAppResolution {
+  if (!companyProfile || typeof companyProfile !== 'object') {
+    return {
+      hasOfficialFields: false,
+      digits: '',
+      source: null,
+      invalidReason: 'Objeto company_profile ausente em store_settings.',
+    };
+  }
+
+  const hasNormalizedProp = Object.prototype.hasOwnProperty.call(
+    companyProfile,
+    'officialWhatsAppNormalized'
+  );
+  const hasFallbackProp = Object.prototype.hasOwnProperty.call(
+    companyProfile,
+    'officialWhatsApp'
+  );
+  const hasOfficialFields = hasNormalizedProp || hasFallbackProp;
+
+  const rawNormalized = toRawPhoneString(companyProfile.officialWhatsAppNormalized);
+  if (rawNormalized) {
+    const parsedNormalized = parseDigitsForOfficialWhatsApp(rawNormalized);
+    if (parsedNormalized) {
+      return {
+        hasOfficialFields: true,
+        digits: parsedNormalized,
+        source: 'officialWhatsAppNormalized',
+        invalidReason: null,
+      };
+    }
+  }
+
+  const rawFallback = toRawPhoneString(companyProfile.officialWhatsApp);
+  if (rawFallback) {
+    const parsedFallback = parseDigitsForOfficialWhatsApp(rawFallback);
+    if (parsedFallback) {
+      return {
+        hasOfficialFields: true,
+        digits: parsedFallback,
+        source: 'officialWhatsApp',
+        invalidReason: null,
+      };
+    }
+  }
+
+  let invalidReason =
+    'Campos officialWhatsAppNormalized e officialWhatsApp estão vazios em store_settings > company_profile.';
+  if (rawNormalized && rawFallback) {
+    invalidReason =
+      'Campos officialWhatsAppNormalized e officialWhatsApp contêm valores inválidos em store_settings > company_profile.';
+  } else if (rawNormalized) {
+    invalidReason =
+      'Campo officialWhatsAppNormalized contém um número inválido e officialWhatsApp está vazio em store_settings > company_profile.';
+  } else if (rawFallback) {
+    invalidReason =
+      'Campo officialWhatsApp contém um número inválido em store_settings > company_profile.';
+  }
+
+  return {
+    hasOfficialFields,
+    digits: '',
+    source: null,
+    invalidReason,
+  };
+}
+
 export function getDeliveryRuleLabel(rule: DeliveryFeeRule): string {
   if (rule.zoneName && rule.zoneName.trim()) {
     return rule.zoneName.trim();
@@ -603,11 +708,94 @@ export function buildWhatsAppOrderMessage(
   ].join('\n');
 }
 
-export function buildWhatsAppUrl(whatsappNumberConfig: string, message: string): string {
-  const normalized = normalizeWhatsAppNumber(whatsappNumberConfig);
-  if (!normalized) {
+export function buildWhatsAppUrl(numero: string, mensagem: string): string {
+  if (typeof numero !== 'string') {
     return '';
   }
-  const encoded = encodeURIComponent(message);
-  return `https://wa.me/${normalized}?text=${encoded}`;
+  const trimmed = numero.trim();
+  if (!trimmed || trimmed === 'SUBSTITUIR_PELO_NUMERO_OFICIAL') {
+    return '';
+  }
+
+  let digitos = trimmed.replace(/\D/g, '');
+  if (!digitos || /^0+$/.test(digitos)) {
+    return '';
+  }
+  if (digitos.startsWith('00')) {
+    digitos = digitos.slice(2);
+  }
+  if (digitos.length === 9 && digitos.startsWith('9')) {
+    digitos = `244${digitos}`;
+  }
+  if (!/^\d{8,15}$/.test(digitos) || /^0+$/.test(digitos)) {
+    return '';
+  }
+
+  return `https://wa.me/${digitos}?text=${encodeURIComponent(mensagem)}`;
+}
+
+export const LAST_CONFIRMED_ORDER_SESSION_KEY = 'bercali_last_confirmed_order_v1';
+
+export interface StoredConfirmedOrderSession {
+  orderNumber: string;
+  whatsappUrl: string;
+}
+
+function getDefaultSessionStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function saveConfirmedOrderToSession(
+  data: StoredConfirmedOrderSession,
+  storage: Storage | null = getDefaultSessionStorage()
+): void {
+  if (!storage) return;
+  const orderNumber = data.orderNumber.trim();
+  if (!orderNumber) return;
+  try {
+    storage.setItem(
+      LAST_CONFIRMED_ORDER_SESSION_KEY,
+      JSON.stringify({
+        orderNumber,
+        whatsappUrl: data.whatsappUrl.trim(),
+      })
+    );
+  } catch {
+    // Ignorar restrições de escrita em modo privado estrito
+  }
+}
+
+export function readConfirmedOrderFromSession(
+  storage: Storage | null = getDefaultSessionStorage()
+): StoredConfirmedOrderSession | null {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(LAST_CONFIRMED_ORDER_SESSION_KEY);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const rec = parsed as Record<string, unknown>;
+    const orderNumber = typeof rec.orderNumber === 'string' ? rec.orderNumber.trim() : '';
+    const whatsappUrl = typeof rec.whatsappUrl === 'string' ? rec.whatsappUrl.trim() : '';
+    if (!orderNumber) return null;
+    return { orderNumber, whatsappUrl };
+  } catch {
+    return null;
+  }
+}
+
+export function clearConfirmedOrderFromSession(
+  storage: Storage | null = getDefaultSessionStorage()
+): void {
+  if (!storage) return;
+  try {
+    storage.removeItem(LAST_CONFIRMED_ORDER_SESSION_KEY);
+  } catch {
+    // Ignorar restrições de armazenamento
+  }
 }

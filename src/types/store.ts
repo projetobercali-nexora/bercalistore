@@ -123,6 +123,8 @@ export interface PublicStoreSettings {
   isStoreActive: boolean;
   closedMessage: string;
   whatsappNumber: string;
+  whatsappSource?: string | null;
+  whatsappInvalidReason?: string | null;
   whatsappMessageTemplate: string | null;
   whatsappOrderTemplate: string | null;
   phone: string | null;

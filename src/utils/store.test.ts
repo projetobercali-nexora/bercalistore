@@ -23,11 +23,15 @@ import {
   buildWhatsAppProductInquiryMessage,
   buildWhatsAppUrl,
   calculateOrderSummary,
+  clearConfirmedOrderFromSession,
   formatInternationalWhatsApp,
   hasConfiguredWhatsApp,
   hasValidationErrors,
   isValidWhatsAppNumber,
   normalizeWhatsAppNumber,
+  readConfirmedOrderFromSession,
+  resolveOfficialWhatsAppFromCompanyProfile,
+  saveConfirmedOrderToSession,
   validateCheckoutForm,
 } from './checkout';
 import {
@@ -1121,7 +1125,102 @@ test('company_profile in store_settings normalizes +244 WhatsApp link, applies t
   assert.ok(waLink.startsWith('https://wa.me/244923777888?text='));
 });
 
+test('officialWhatsAppNormalized, officialWhatsApp fallback, buildWhatsAppUrl, and sessionStorage order state follow exact rules', () => {
+  assert.equal(WHATSAPP_NUMBER, '');
 
+  // 1. Prioriza officialWhatsAppNormalized em store_settings > company_profile
+  const withNormalized = extractPublicStoreSettings([
+    {
+      setting_key: 'company_profile',
+      setting_value: {
+        name: 'Bercali Store',
+        officialWhatsAppNormalized: '+244923888777',
+        officialWhatsApp: '923000111',
+      },
+    },
+  ]);
+  assert.equal(withNormalized.whatsappNumber, '244923888777');
+  assert.equal(
+    withNormalized.whatsappSource,
+    'store_settings.company_profile.officialWhatsAppNormalized'
+  );
+  assert.equal(withNormalized.whatsappInvalidReason, null);
 
+  // 2. Quando officialWhatsAppNormalized está vazio, usa officialWhatsApp (só dígitos; 9 dígitos começados por 9 -> junta 244)
+  const withOfficialFallback = extractPublicStoreSettings([
+    {
+      setting_key: 'company_profile',
+      setting_value: {
+        name: 'Bercali Store',
+        officialWhatsAppNormalized: '   ',
+        officialWhatsApp: '923 888 777',
+      },
+    },
+  ]);
+  assert.equal(withOfficialFallback.whatsappNumber, '244923888777');
+  assert.equal(
+    withOfficialFallback.whatsappSource,
+    'store_settings.company_profile.officialWhatsApp'
+  );
+  assert.equal(withOfficialFallback.whatsappInvalidReason, null);
 
+  // 3. Quando ambos estão vazios ou inválidos, whatsappNumber fica vazio e regista o motivo explícito
+  const invalidOfficial = extractPublicStoreSettings([
+    {
+      setting_key: 'company_profile',
+      setting_value: {
+        name: 'Bercali Store',
+        officialWhatsAppNormalized: '',
+        officialWhatsApp: '123',
+        phone: '+244 222 111 000',
+      },
+    },
+  ]);
+  assert.equal(invalidOfficial.whatsappNumber, '');
+  assert.ok(invalidOfficial.whatsappInvalidReason?.includes('officialWhatsApp'));
+
+  const directResolution = resolveOfficialWhatsAppFromCompanyProfile({
+    officialWhatsAppNormalized: '',
+    officialWhatsApp: '924123456',
+  });
+  assert.equal(directResolution.digits, '244924123456');
+  assert.equal(directResolution.source, 'officialWhatsApp');
+
+  // 4. buildWhatsAppUrl(numero, mensagem) mantém só os dígitos e codifica a mensagem
+  const builtUrl = buildWhatsAppUrl('+244 923 888 777', 'Pedido ORD-1: 25.000 Kz');
+  assert.equal(
+    builtUrl,
+    'https://wa.me/244923888777?text=Pedido%20ORD-1%3A%2025.000%20Kz'
+  );
+  assert.equal(buildWhatsAppUrl('123', 'Teste'), '');
+  assert.equal(buildWhatsAppUrl('', 'Teste'), '');
+
+  // 5. sessionStorage guarda, lê e limpa o código e o URL do WhatsApp
+  const mem = new Map<string, string>();
+  const fakeStorage = {
+    get length() {
+      return mem.size;
+    },
+    clear: () => mem.clear(),
+    getItem: (k: string) => mem.get(k) ?? null,
+    key: (i: number) => Array.from(mem.keys())[i] ?? null,
+    removeItem: (k: string) => {
+      mem.delete(k);
+    },
+    setItem: (k: string, v: string) => {
+      mem.set(k, v);
+    },
+  } as Storage;
+
+  saveConfirmedOrderToSession(
+    { orderNumber: 'ORD-2026-5001', whatsappUrl: builtUrl },
+    fakeStorage
+  );
+  assert.deepEqual(readConfirmedOrderFromSession(fakeStorage), {
+    orderNumber: 'ORD-2026-5001',
+    whatsappUrl: builtUrl,
+  });
+  clearConfirmedOrderFromSession(fakeStorage);
+  assert.equal(readConfirmedOrderFromSession(fakeStorage), null);
+});
 

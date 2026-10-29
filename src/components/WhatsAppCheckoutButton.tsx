@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
-  CheckCircle2,
   Loader2,
   Lock,
-  MessageCircle,
   RefreshCw,
   ShoppingBag,
 } from 'lucide-react';
@@ -30,6 +28,7 @@ export interface ConfirmedOrderResult {
   whatsappUrl: string;
   whatsappMessage: string;
   summary: OrderSummaryCalculation;
+  whatsappInvalidReason?: string | null;
 }
 
 interface WhatsAppCheckoutButtonProps {
@@ -51,14 +50,12 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
 }) => {
   const {
     whatsappNumber,
-    hasWhatsApp,
     deliveryFeeRules,
     storeSettings,
     isStoreActive,
     refreshCatalog,
   } = useCatalog();
   const [orderNumber, setOrderNumber] = useState<string>(() => generateOrderNumber());
-  const [showMessagePreview, setShowMessagePreview] = useState(false);
   const [persistenceStatus, setPersistenceStatus] = useState<OrderPersistenceStatus>('idle');
   const [persistenceMessage, setPersistenceMessage] = useState<string | null>(null);
   const [verifiedSummary, setVerifiedSummary] = useState<OrderSummaryCalculation | null>(null);
@@ -109,14 +106,6 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
   });
   const isFormValid = !hasValidationErrors(errors) && effectiveSummary.lines.length > 0;
   const isSubmitting = persistenceStatus === 'saving';
-
-  const preparedMessage = buildWhatsAppOrderMessage(
-    customer,
-    effectiveSummary,
-    orderNumber,
-    brandName,
-    orderTemplate
-  );
 
   const handleConfirmOrder = useCallback(async () => {
     if (!isStoreActive) {
@@ -176,13 +165,14 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         finalOrderTemplate
       );
       const finalWhatsappUrl = buildWhatsAppUrl(resolvedWhatsappNumber, finalMessage);
+      const invalidReason = !finalWhatsappUrl
+        ? activeSettings.whatsappInvalidReason ||
+          'Número de WhatsApp da loja vazio ou inválido nas definições.'
+        : null;
 
       savedSignatureRef.current = payloadSignature;
       setOrderNumber(finalOrderNumber);
       setPersistenceStatus('saved');
-      setPersistenceMessage(
-        `Encomenda ${finalOrderNumber} registada com sucesso na ${finalBrandName}.`
-      );
 
       if (onOrderConfirmed) {
         onOrderConfirmed({
@@ -190,6 +180,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
           whatsappUrl: finalWhatsappUrl,
           whatsappMessage: finalMessage,
           summary: finalSummary,
+          whatsappInvalidReason: invalidReason,
         });
       } else {
         onConfirmClearCart?.(finalOrderNumber);
@@ -201,7 +192,6 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
   }, [
     brandName,
     customer,
-    hasWhatsApp,
     isFormValid,
     isStoreActive,
     onConfirmClearCart,
@@ -212,7 +202,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
     orderTemplate,
     payloadSignature,
     refreshCatalog,
-    storeSettings.closedMessage,
+    storeSettings,
     summary,
     whatsappNumber,
   ]);
@@ -246,11 +236,6 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
             <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
             <span>A registar encomenda...</span>
           </>
-        ) : hasWhatsApp ? (
-          <>
-            <MessageCircle className="h-5 w-5 shrink-0" />
-            <span>Confirmar pedido pelo WhatsApp</span>
-          </>
         ) : (
           <>
             <ShoppingBag className="h-5 w-5 shrink-0" />
@@ -258,39 +243,6 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
           </>
         )}
       </button>
-
-      {isFormValid && !isSubmitting && (
-        <button
-          type="button"
-          onClick={() => setShowMessagePreview((prev) => !prev)}
-          aria-expanded={showMessagePreview}
-          className="inline-flex min-h-[42px] w-full items-center justify-center rounded-xl border border-white/15 bg-[#0A0A0A] px-4 py-2 text-xs font-medium text-[#8A8A8A] hover:text-white transition-colors cursor-pointer"
-        >
-          {showMessagePreview ? 'Ocultar resumo da mensagem' : 'Ver resumo preparado'}
-        </button>
-      )}
-
-      {isSubmitting && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-center gap-2.5 rounded-xl bg-[#0A0A0A] border border-white/15 p-3.5 text-xs text-white/90"
-        >
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#FF8A00]" />
-          <span>A registar a tua encomenda antes de abrir a confirmação...</span>
-        </div>
-      )}
-
-      {persistenceStatus === 'saved' && persistenceMessage && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-start gap-2.5 rounded-xl bg-[#0A0A0A] border border-[#22C55E]/40 p-3.5 text-xs text-[#22C55E]"
-        >
-          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{persistenceMessage}</span>
-        </div>
-      )}
 
       {(persistenceStatus === 'store_closed' ||
         persistenceStatus === 'stock_conflict' ||
@@ -324,12 +276,6 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
             )}
           </div>
         )}
-
-      {showMessagePreview && isFormValid && (
-        <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl bg-[#0A0A0A] border border-white/10 p-4 font-sans text-xs text-white/90 leading-relaxed">
-          {preparedMessage}
-        </pre>
-      )}
 
       <p className="text-xs text-[#8A8A8A] leading-relaxed">{storeSettings.orderDisclaimer}</p>
     </div>

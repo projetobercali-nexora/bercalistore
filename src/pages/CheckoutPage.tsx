@@ -2,12 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
-  Check,
   CheckCircle2,
-  Copy,
-  ExternalLink,
   Lock,
-  MessageCircle,
   ShoppingBag,
 } from 'lucide-react';
 import { CheckoutForm } from '../components/CheckoutForm';
@@ -25,7 +21,14 @@ import type {
   CustomerCheckoutData,
   DeliveryFeeRule,
 } from '../types/store';
-import { calculateOrderSummary, validateCheckoutForm } from '../utils/checkout';
+import {
+  calculateOrderSummary,
+  clearConfirmedOrderFromSession,
+  readConfirmedOrderFromSession,
+  saveConfirmedOrderToSession,
+  validateCheckoutForm,
+  type StoredConfirmedOrderSession,
+} from '../utils/checkout';
 import {
   META_PIXEL_READY_EVENT,
   trackMetaContact,
@@ -56,22 +59,24 @@ const FIELD_ORDER: (keyof CustomerCheckoutData)[] = [
   'addressReference',
 ];
 
-function redirectToWhatsAppImmediately(url: string): void {
-  if (typeof window === 'undefined' || !url) return;
-  window.location.href = url;
-}
-
 export const CheckoutPage: React.FC = () => {
-  const { lines, clearCart } = useCart();
+  const { items, lines, clearCart } = useCart();
   const { deliveryFeeRules, storeSettings, hasWhatsApp, isStoreActive } = useCatalog();
   const [customer, setCustomer] = useState<CustomerCheckoutData>(INITIAL_CUSTOMER);
   const [touchedSubmit, setTouchedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrderResult | null>(null);
-  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<StoredConfirmedOrderSession | null>(() =>
+    items.length === 0 ? readConfirmedOrderFromSession() : null
+  );
   const trackedInitiateCheckoutRef = useRef(false);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
+
+  useEffect(() => {
+    if (items.length > 0 && !confirmedOrder) {
+      clearConfirmedOrderFromSession();
+    }
+  }, [confirmedOrder, items.length]);
 
   const errors: CheckoutValidationErrors = useMemo(
     () =>
@@ -158,34 +163,36 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handleOrderConfirmed = (result: ConfirmedOrderResult) => {
-    clearCart();
-    setConfirmedOrder(result);
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    const sessionOrder: StoredConfirmedOrderSession = {
+      orderNumber: result.orderNumber,
+      whatsappUrl: result.whatsappUrl,
+    };
+
+    saveConfirmedOrderToSession(sessionOrder);
 
     if (result.whatsappUrl) {
-      trackMetaContact('Finalizar Compra WhatsApp');
-      redirectToWhatsAppImmediately(result.whatsappUrl);
+      trackMetaContact('Confirmar pedido');
+      clearCart();
+      setConfirmedOrder(sessionOrder);
+      window.location.href = result.whatsappUrl;
+      return;
     }
-  };
 
-  const handleCopyOrderMessage = async () => {
-    if (!confirmedOrder) return;
-    try {
-      await navigator.clipboard.writeText(confirmedOrder.whatsappMessage);
-      setCopiedSummary(true);
-      window.setTimeout(() => setCopiedSummary(false), 2500);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = confirmedOrder.whatsappMessage;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopiedSummary(true);
-      window.setTimeout(() => setCopiedSummary(false), 2500);
+    if (typeof console !== 'undefined') {
+      console.error(
+        '[Bercali Store · Checkout WhatsApp] Número de WhatsApp vazio ou inválido; redirecionamento cancelado:',
+        {
+          orderNumber: result.orderNumber,
+          reason:
+            result.whatsappInvalidReason ||
+            'Número de WhatsApp da loja vazio ou inválido nas definições.',
+        }
+      );
     }
+
+    clearCart();
+    setConfirmedOrder(sessionOrder);
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   if (confirmedOrder) {
@@ -214,55 +221,24 @@ export const CheckoutPage: React.FC = () => {
             </p>
           </div>
 
-          <p className="text-sm text-[#8A8A8A] leading-relaxed">
-            {confirmedOrder.whatsappUrl
-              ? `Estamos a encaminhar-te para o WhatsApp da ${brandName} com o resumo completo da tua encomenda. Caso não abra automaticamente, toca em "Abrir WhatsApp" abaixo.`
-              : 'Guarda o teu código; a nossa equipa vai contactar-te.'}
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-1">
-            {confirmedOrder.whatsappUrl && (
+          {confirmedOrder.whatsappUrl ? (
+            <p className="pt-1 text-xs text-[#8A8A8A]">
+              Não abriu o WhatsApp?{' '}
               <a
                 href={confirmedOrder.whatsappUrl}
-                rel="noopener noreferrer"
                 onClick={() => {
-                  trackMetaContact('Abrir WhatsApp Encomenda');
+                  trackMetaContact('Confirmar pedido');
                 }}
-                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-3 font-display text-xs sm:text-sm font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99]"
+                className="underline underline-offset-4 text-[#FF8A00] hover:text-[#FFC400] transition-colors"
               >
-                <MessageCircle className="h-4 w-4 shrink-0" />
-                <span>Abrir WhatsApp</span>
-                <ExternalLink className="h-4 w-4 shrink-0" />
+                Toca aqui
               </a>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void handleCopyOrderMessage()}
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#0A0A0A] px-5 py-3 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
-            >
-              {copiedSummary ? (
-                <>
-                  <Check className="h-4 w-4 text-[#22C55E]" />
-                  <span className="text-[#22C55E]">Resumo copiado</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4 text-[#FF8A00]" />
-                  <span>Copiar resumo do pedido</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="pt-2">
-            <Link
-              to="/"
-              className="inline-flex min-h-[44px] items-center justify-center text-xs sm:text-sm font-medium text-[#8A8A8A] hover:text-white transition-colors"
-            >
-              Voltar à página inicial
-            </Link>
-          </div>
+            </p>
+          ) : (
+            <p role="status" className="text-sm text-[#8A8A8A] leading-relaxed">
+              Pedido registado. A equipa vai contactar-te no número indicado
+            </p>
+          )}
         </div>
       </div>
     );

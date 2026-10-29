@@ -19,6 +19,7 @@ import {
   isValidEmailAddress,
   isValidWhatsAppNumber,
   normalizeWhatsAppNumber,
+  resolveOfficialWhatsAppFromCompanyProfile,
 } from './checkout';
 import { isProductPurchasable, slugifyCategory } from './format';
 
@@ -200,6 +201,9 @@ export function createDefaultPublicStoreSettings(): PublicStoreSettings {
     isStoreActive: true,
     closedMessage: DEFAULT_CLOSED_STORE_MESSAGE,
     whatsappNumber: WHATSAPP_NUMBER,
+    whatsappSource: null,
+    whatsappInvalidReason:
+      'Nenhum número de WhatsApp configurado em store_settings > company_profile (officialWhatsAppNormalized / officialWhatsApp).',
     whatsappMessageTemplate: null,
     whatsappOrderTemplate: null,
     phone: null,
@@ -719,6 +723,7 @@ export function extractPublicStoreSettings(
 ): PublicStoreSettings {
   const result = createDefaultPublicStoreSettings();
   let explicitWhatsappState: 'unset' | 'set' | 'cleared' = 'unset';
+  let lockedByOfficialCompanyProfile = false;
 
   const applySocialRecord = (obj: Record<string, unknown>) => {
     const ig = normalizeSocialUrl(
@@ -868,7 +873,7 @@ export function extractPublicStoreSettings(
       result.closedMessage = closedMsg;
     }
 
-    // Contactos: WhatsApp (incluindo company_profile), Modelo de Mensagem, Telefone, E-mail e Morada
+    // Contactos: ler primeiro de `store_settings > company_profile` os campos `officialWhatsAppNormalized` e `officialWhatsApp`
     const nestedWaObj =
       typeof obj.whatsapp === 'object' && obj.whatsapp !== null && !Array.isArray(obj.whatsapp)
         ? (obj.whatsapp as Record<string, unknown>)
@@ -876,42 +881,65 @@ export function extractPublicStoreSettings(
         ? (obj.whatsApp as Record<string, unknown>)
         : null;
 
-    const whatsappFields = [
-      nestedWaObj ? nestedWaObj.number ?? nestedWaObj.phone ?? nestedWaObj.value : obj.whatsapp,
-      nestedWaObj ? undefined : obj.whatsApp,
-      obj.whatsapp_number,
-      obj.whatsappNumber,
-      obj.whatsAppNumber,
-      obj.whatsapp_phone,
-      obj.whatsappPhone,
-      obj.whatsAppPhone,
-      obj.phone_whatsapp,
-      obj.phoneWhatsapp,
-      obj.store_whatsapp,
-      obj.storeWhatsapp,
-      obj.support_whatsapp,
-      obj.supportWhatsapp,
-      obj.contact_whatsapp,
-      obj.contactWhatsapp,
-      obj.whatsapp_contact,
-      obj.whatsappContact,
-    ];
-    const hasExplicitWaField = whatsappFields.some((v) => v !== undefined);
-    let waCandidate: string | null = null;
-    for (const candidateVal of whatsappFields) {
-      const normalized = normalizePhoneCandidate(candidateVal);
-      if (normalized) {
-        waCandidate = normalized;
-        break;
+    const officialWa = resolveOfficialWhatsAppFromCompanyProfile(obj);
+    if (officialWa.hasOfficialFields) {
+      lockedByOfficialCompanyProfile = true;
+      if (officialWa.digits) {
+        result.whatsappNumber = officialWa.digits;
+        result.whatsappSource = `store_settings.company_profile.${officialWa.source}`;
+        result.whatsappInvalidReason = null;
+        explicitWhatsappState = 'set';
+      } else {
+        result.whatsappNumber = '';
+        result.whatsappSource = null;
+        result.whatsappInvalidReason = officialWa.invalidReason;
+        explicitWhatsappState = 'cleared';
       }
-    }
+    } else if (!lockedByOfficialCompanyProfile) {
 
-    if (waCandidate) {
-      result.whatsappNumber = waCandidate;
-      explicitWhatsappState = 'set';
-    } else if (hasExplicitWaField && explicitWhatsappState !== 'set') {
-      result.whatsappNumber = '';
-      explicitWhatsappState = 'cleared';
+      const whatsappFields = [
+        nestedWaObj ? nestedWaObj.number ?? nestedWaObj.phone ?? nestedWaObj.value : obj.whatsapp,
+        nestedWaObj ? undefined : obj.whatsApp,
+        obj.whatsapp_number,
+        obj.whatsappNumber,
+        obj.whatsAppNumber,
+        obj.whatsapp_phone,
+        obj.whatsappPhone,
+        obj.whatsAppPhone,
+        obj.phone_whatsapp,
+        obj.phoneWhatsapp,
+        obj.store_whatsapp,
+        obj.storeWhatsapp,
+        obj.support_whatsapp,
+        obj.supportWhatsapp,
+        obj.contact_whatsapp,
+        obj.contactWhatsapp,
+        obj.whatsapp_contact,
+        obj.whatsappContact,
+      ];
+      const hasExplicitWaField = whatsappFields.some((v) => v !== undefined);
+      let waCandidate: string | null = null;
+      for (const candidateVal of whatsappFields) {
+        const normalized = normalizePhoneCandidate(candidateVal);
+        if (normalized) {
+          waCandidate = normalized;
+          break;
+        }
+      }
+
+      if (waCandidate) {
+        result.whatsappNumber = waCandidate;
+        result.whatsappSource = `store_settings.${groupKey}`;
+        result.whatsappInvalidReason = null;
+        explicitWhatsappState = 'set';
+      } else if (hasExplicitWaField && explicitWhatsappState !== 'set') {
+        result.whatsappNumber = '';
+        result.whatsappSource = null;
+        result.whatsappInvalidReason = `Número de WhatsApp vazio ou inválido em store_settings > ${groupKey}.`;
+        explicitWhatsappState = 'cleared';
+      } else if (groupKey === 'company_profile' && explicitWhatsappState === 'unset') {
+        result.whatsappInvalidReason = officialWa.invalidReason;
+      }
     }
 
     const msgTemplateCandidate =
@@ -1176,12 +1204,18 @@ export function extractPublicStoreSettings(
           normalizePhoneCandidate(obj.whatsapp) ??
           normalizePhoneCandidate(obj.phone) ??
           normalizePhoneCandidate(obj.value);
-        if (wa) {
-          result.whatsappNumber = wa;
-          explicitWhatsappState = 'set';
-        } else if (explicitWhatsappState !== 'set') {
-          result.whatsappNumber = '';
-          explicitWhatsappState = 'cleared';
+        if (!lockedByOfficialCompanyProfile) {
+          if (wa) {
+            result.whatsappNumber = wa;
+            result.whatsappSource = `store_settings.${key}`;
+            result.whatsappInvalidReason = null;
+            explicitWhatsappState = 'set';
+          } else if (explicitWhatsappState !== 'set') {
+            result.whatsappNumber = '';
+            result.whatsappSource = null;
+            result.whatsappInvalidReason = `Número de WhatsApp vazio ou inválido em store_settings (${key}).`;
+            explicitWhatsappState = 'cleared';
+          }
         }
         if (obj.message !== undefined || obj.template !== undefined) {
           const tpl = toCleanString(obj.template ?? obj.message);
@@ -1314,13 +1348,19 @@ export function extractPublicStoreSettings(
       case 'support_whatsapp':
       case 'contact_whatsapp':
       case 'whatsapp_phone': {
-        const wa = normalizePhoneCandidate(val);
-        if (wa) {
-          result.whatsappNumber = wa;
-          explicitWhatsappState = 'set';
-        } else if (explicitWhatsappState !== 'set') {
-          result.whatsappNumber = '';
-          explicitWhatsappState = 'cleared';
+        if (!lockedByOfficialCompanyProfile) {
+          const wa = normalizePhoneCandidate(val);
+          if (wa) {
+            result.whatsappNumber = wa;
+            result.whatsappSource = `store_settings.${key}`;
+            result.whatsappInvalidReason = null;
+            explicitWhatsappState = 'set';
+          } else if (explicitWhatsappState !== 'set') {
+            result.whatsappNumber = '';
+            result.whatsappSource = null;
+            result.whatsappInvalidReason = `Número de WhatsApp vazio ou inválido em store_settings (${key}).`;
+            explicitWhatsappState = 'cleared';
+          }
         }
         break;
       }
