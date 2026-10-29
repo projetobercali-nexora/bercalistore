@@ -37,6 +37,7 @@ const INITIAL_CUSTOMER: CustomerCheckoutData = {
   phone: '',
   email: '',
   deliveryZone: '',
+  deliveryZoneId: null,
   province: '',
   municipality: '',
   neighborhood: '',
@@ -140,6 +141,7 @@ export const CheckoutPage: React.FC = () => {
     setCustomer((prev) => ({
       ...prev,
       deliveryZone: zoneLabel,
+      deliveryZoneId: matchedRule?.id ?? null,
       province: matchedRule?.province ? matchedRule.province : prev.province,
       municipality: matchedRule?.municipality ? matchedRule.municipality : prev.municipality,
       neighborhood: matchedRule?.neighborhood ? matchedRule.neighborhood : prev.neighborhood,

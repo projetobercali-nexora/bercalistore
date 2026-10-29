@@ -26,8 +26,9 @@ import {
 import {
   applyFeaturedSelection,
   attachRelationsToProducts,
+  buildCreateStorefrontOrderRpcArgs,
   buildStoreCategories,
-  buildSupabaseOrderPayloads,
+  classifyCheckoutRpcError,
   createDefaultPublicStoreSettings,
   extractPublicStoreSettings,
   generateOrderNumber,
@@ -66,6 +67,7 @@ const PRODUCT_MEDIA_COLUMNS =
 // Controlos em memória contra cliques repetidos / submissões concorrentes da mesma encomenda
 const inFlightOrderSubmissions = new Map<string, Promise<OrderSubmissionResult>>();
 const completedOrderSubmissions = new Map<string, OrderSubmissionResult>();
+const activeOrderIdempotencyKeys = new Map<string, string>();
 
 async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
   if (!supabase || !SUPABASE_PUBLIC_URL || !sku.trim()) {
@@ -499,13 +501,6 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
   }
 }
 
-function isMissingRpcError(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === 'PGRST202' || error.code === '42883') return true;
-  const msg = (error.message ?? '').toLowerCase();
-  return msg.includes('could not find the function') || msg.includes('does not exist');
-}
-
 function buildSubmissionIdempotencyKey(
   orderNumber: string,
   customer: CustomerCheckoutData,
@@ -523,8 +518,19 @@ function buildSubmissionIdempotencyKey(
     customer.province.trim().toLowerCase(),
     customer.municipality.trim().toLowerCase(),
     customer.neighborhood.trim().toLowerCase(),
+    customer.addressReference.trim().toLowerCase(),
     itemsSignature,
   ].join('::');
+}
+
+function getOrCreateRpcIdempotencyKey(submissionSignature: string, orderNumber: string): string {
+  const existing = activeOrderIdempotencyKeys.get(submissionSignature);
+  if (existing) {
+    return existing;
+  }
+  const uniqueKey = `${orderNumber.trim()}-${generateUuid()}`;
+  activeOrderIdempotencyKeys.set(submissionSignature, uniqueKey);
+  return uniqueKey;
 }
 
 function extractRpcResultDetails(
@@ -534,30 +540,58 @@ function extractRpcResultDetails(
 ): { orderNumber: string; orderId: string } {
   if (typeof rpcData === 'string' && rpcData.trim()) {
     const trimmed = rpcData.trim();
-    // Se a função devolver um código legível (ex.: BRC-... ou ORD-...), usa-o como orderNumber
     if (/^[A-Z]{2,5}-/i.test(trimmed)) {
       return { orderNumber: trimmed, orderId: fallbackOrderId };
     }
     return { orderNumber: fallbackOrderNumber, orderId: trimmed };
   }
 
-  const candidateObj = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : rpcData;
-  if (typeof candidateObj === 'object' && candidateObj !== null) {
-    const rec = candidateObj as Record<string, unknown>;
-    const returnedCode =
-      typeof rec.order_number === 'string' && rec.order_number.trim()
-        ? rec.order_number.trim()
-        : typeof rec.order_code === 'string' && rec.order_code.trim()
-        ? rec.order_code.trim()
-        : typeof rec.code === 'string' && rec.code.trim()
-        ? rec.code.trim()
-        : fallbackOrderNumber;
-    const returnedId =
-      typeof rec.order_id === 'string' && rec.order_id.trim()
-        ? rec.order_id.trim()
-        : typeof rec.id === 'string' && rec.id.trim()
-        ? rec.id.trim()
-        : fallbackOrderId;
+  const topCandidate = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0] : rpcData;
+  if (typeof topCandidate === 'object' && topCandidate !== null) {
+    const outer = topCandidate as Record<string, unknown>;
+    const nested =
+      typeof outer.order === 'object' && outer.order !== null
+        ? (outer.order as Record<string, unknown>)
+        : typeof outer.data === 'object' && outer.data !== null
+        ? (outer.data as Record<string, unknown>)
+        : null;
+    const rec = nested ?? outer;
+
+    const codeCandidates = [
+      rec.order_number,
+      rec.orderNumber,
+      rec.order_code,
+      rec.orderCode,
+      rec.code,
+      rec.number,
+      outer.order_number,
+      outer.orderNumber,
+      outer.code,
+    ];
+    let returnedCode = fallbackOrderNumber;
+    for (const c of codeCandidates) {
+      if (typeof c === 'string' && c.trim()) {
+        returnedCode = c.trim();
+        break;
+      }
+    }
+
+    const idCandidates = [
+      rec.order_id,
+      rec.orderId,
+      rec.id,
+      outer.order_id,
+      outer.orderId,
+      outer.id,
+    ];
+    let returnedId = fallbackOrderId;
+    for (const idVal of idCandidates) {
+      if (typeof idVal === 'string' && idVal.trim()) {
+        returnedId = idVal.trim();
+        break;
+      }
+    }
+
     return { orderNumber: returnedCode, orderId: returnedId };
   }
 
@@ -568,8 +602,7 @@ function extractRpcResultDetails(
  * Grava a encomenda na base de dados usando a função RPC `create_storefront_order`:
  * 1. Bloqueia duplicações por cliques repetidos (idempotência em voo e concluída).
  * 2. Revalida em tempo real o estado ativo/inativo da loja em `store_settings` e o stock/preço oficial.
- * 3. Executa a função RPC `create_storefront_order` com a chave pública `anon` e só confirma sucesso
- *    quando a gravação na base de dados terminar sem erro.
+ * 3. Executa `supabase.rpc('create_storefront_order', {...})` com os nomes e formatos exatos da função.
  */
 export async function submitOrderToSupabase(
   customer: CustomerCheckoutData,
@@ -607,17 +640,19 @@ export async function submitOrderToSupabase(
     quantity: line.quantity,
   }));
 
-  const idempotencyKey = buildSubmissionIdempotencyKey(orderNumber, customer, requestedItems);
+  const submissionSignature = buildSubmissionIdempotencyKey(orderNumber, customer, requestedItems);
 
-  const alreadySaved = completedOrderSubmissions.get(idempotencyKey);
+  const alreadySaved = completedOrderSubmissions.get(submissionSignature);
   if (alreadySaved) {
     return alreadySaved;
   }
 
-  const existingInFlight = inFlightOrderSubmissions.get(idempotencyKey);
+  const existingInFlight = inFlightOrderSubmissions.get(submissionSignature);
   if (existingInFlight) {
     return existingInFlight;
   }
+
+  const rpcIdempotencyKey = getOrCreateRpcIdempotencyKey(submissionSignature, orderNumber);
 
   const executionPromise = (async (): Promise<OrderSubmissionResult> => {
     try {
@@ -631,7 +666,7 @@ export async function submitOrderToSupabase(
         status: 0,
       }));
 
-      // 1. Revalidação autoritativa do estado da loja, stock e preços reais no Supabase
+      // 1. Revalidação do estado da loja, stock e preços reais no Supabase quando acessível
       let [liveProductsRes, liveSettingsRes] = await Promise.all([
         supabase.from('products').select(PRODUCTS_COLUMNS).in('id', productIds),
         safeSettingsQuery,
@@ -645,192 +680,179 @@ export async function submitOrderToSupabase(
         liveProductsRes = fallbackLiveProducts as typeof liveProductsRes;
       }
 
-      if (liveProductsRes.error) {
-        if (typeof console !== 'undefined') {
-          console.error(
-            '[Bercali Store · Diagnóstico Encomenda]',
-            buildCatalogTechnicalDiagnostic({
-              configured: true,
-              table: 'public.products',
-              supabaseHost: SUPABASE_CONFIG_STATUS.urlHost,
-              postgrestError: toPostgrestLikeError(liveProductsRes.error, liveProductsRes.status),
-            })
-          );
-        }
-        return {
-          ok: false,
-          status: 'error',
-          orderNumber,
-          errorCode: liveProductsRes.error.code,
-          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-        };
-      }
-
-      const liveProducts = (liveProductsRes.data ?? []) as unknown as SupabaseProductRow[];
-      const liveSettings =
+      const liveSettingsRows =
         !liveSettingsRes.error && Array.isArray(liveSettingsRes.data)
           ? (liveSettingsRes.data as unknown as SupabaseStoreSettingRow[])
           : [];
 
-      const verification = verifyAndRecalculateOrder({
-        requestedItems,
-        customer,
-        liveProductRows: liveProducts,
-        liveSettingsRows: liveSettings,
-        supabaseUrl: SUPABASE_PUBLIC_URL,
-      });
+      let effectiveSummary = summary;
+      let effectiveStoreSettings = extractPublicStoreSettings(
+        liveSettingsRows,
+        SUPABASE_PUBLIC_URL
+      );
 
-      if (!verification.ok) {
-        return {
-          ok: false,
-          status: verification.reason,
-          orderNumber,
-          errorMessage: verification.message,
-        };
+      if (liveProductsRes.error) {
+        if (typeof console !== 'undefined') {
+          console.warn(
+            '[Bercali Store · Diagnóstico Encomenda] Aviso na pré-verificação de produtos (a prosseguir para create_storefront_order):',
+            {
+              code: liveProductsRes.error.code ?? null,
+              message: liveProductsRes.error.message ?? null,
+              details: liveProductsRes.error.details ?? null,
+            }
+          );
+        }
+      } else {
+        const liveProducts = (liveProductsRes.data ?? []) as unknown as SupabaseProductRow[];
+        const verification = verifyAndRecalculateOrder({
+          requestedItems,
+          customer,
+          liveProductRows: liveProducts,
+          liveSettingsRows,
+          supabaseUrl: SUPABASE_PUBLIC_URL,
+        });
+
+        effectiveStoreSettings = verification.storeSettings;
+
+        if (!verification.ok) {
+          activeOrderIdempotencyKeys.delete(submissionSignature);
+          return {
+            ok: false,
+            status: verification.reason,
+            orderNumber,
+            errorMessage: verification.message,
+          };
+        }
+
+        effectiveSummary = verification.verifiedSummary;
       }
 
       const zoneErrors = validateCheckoutForm(customer, {
         mode: 'storefront',
-        deliveryZones: verification.storeSettings.deliveryFeeRules,
+        deliveryZones: effectiveStoreSettings.deliveryFeeRules,
       });
       if (hasValidationErrors(zoneErrors)) {
+        activeOrderIdempotencyKeys.delete(submissionSignature);
         return {
           ok: false,
           status: 'error',
           orderNumber,
-          errorMessage: zoneErrors.deliveryZone ?? 'Seleciona a zona de entrega antes de confirmar.',
+          errorMessage:
+            zoneErrors.deliveryZone ?? 'Seleciona a zona de entrega antes de confirmar.',
         };
       }
 
-      const verifiedSummary = verification.verifiedSummary;
-      const customerId = generateUuid();
-      const orderId = generateUuid();
-      const { customerRow, orderRow, orderItemRows } = buildSupabaseOrderPayloads({
-        customerId,
-        orderId,
-        orderNumber,
+      const fallbackOrderId = generateUuid();
+      const rpcArgs = buildCreateStorefrontOrderRpcArgs({
         customer,
-        summary: verifiedSummary,
+        summary: effectiveSummary,
+        idempotencyKey: rpcIdempotencyKey,
+        deliveryZones: effectiveStoreSettings.deliveryFeeRules,
       });
 
-      const rpcItems = orderItemRows.map((item) => ({
-        product_id: item.product_id,
-        product_name: item.product_name,
-        product_sku: item.product_sku,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        line_total: item.line_total,
-      }));
+      // 2. Chamada RPC exata a `create_storefront_order`
+      const rpcRes = await supabase.rpc('create_storefront_order', rpcArgs);
 
-      // 2. Gravação transacional atómica via RPC `create_storefront_order`
-      const baseRpcArgs = {
-        p_order_number: orderRow.order_number,
-        p_full_name: customerRow.full_name,
-        p_phone: customerRow.phone,
-        p_city: customerRow.city,
-        p_customer_notes: customerRow.notes,
-        p_delivery_address: orderRow.delivery_address,
-        p_internal_notes: orderRow.internal_notes,
-        p_subtotal: orderRow.subtotal,
-        p_delivery_fee: orderRow.delivery_fee,
-        p_discount_amount: orderRow.discount_amount,
-        p_total_amount: orderRow.total_amount,
-        p_currency: orderRow.currency,
-        p_items: rpcItems,
-      };
+      if (rpcRes.error) {
+        activeOrderIdempotencyKeys.delete(submissionSignature);
 
-      let rpcRes = await supabase.rpc('create_storefront_order', {
-        ...baseRpcArgs,
-        p_email: customerRow.email,
-      });
+        if (typeof console !== 'undefined') {
+          console.error('[Bercali Store · Checkout RPC Error]', {
+            code: rpcRes.error.code ?? null,
+            message: rpcRes.error.message ?? null,
+            details: rpcRes.error.details ?? null,
+          });
+        }
 
-      // Compatibilidade caso a função RPC tenha sido criada sem `p_email` ou com assinatura compacta do painel
-      if (rpcRes.error && isMissingRpcError(rpcRes.error)) {
-        rpcRes = await supabase.rpc('create_storefront_order', baseRpcArgs);
-      }
+        const classified = classifyCheckoutRpcError(
+          rpcRes.error,
+          effectiveStoreSettings.closedMessage
+        );
 
-      if (rpcRes.error && isMissingRpcError(rpcRes.error)) {
-        const zoneText = (customer.deliveryZone ?? '').trim() || customerRow.city || null;
-        rpcRes = await supabase.rpc('create_storefront_order', {
-          p_customer_name: customerRow.full_name,
-          p_customer_phone: customerRow.phone,
-          p_delivery_zone: zoneText,
-          p_delivery_address: orderRow.delivery_address,
-          p_notes: customerRow.notes,
-          p_delivery_fee: orderRow.delivery_fee,
-          p_items: rpcItems,
-        });
-      }
-
-      if (!rpcRes.error) {
-        const resolved = extractRpcResultDetails(rpcRes.data, orderNumber, orderId);
-
-        const successResult: OrderSubmissionResult = {
-          ok: true,
-          status: 'saved',
-          orderNumber: resolved.orderNumber,
-          orderId: resolved.orderId,
-          verifiedSummary,
-        };
-        completedOrderSubmissions.set(idempotencyKey, successResult);
-        return successResult;
-      }
-
-      const errMsg = rpcRes.error.message ?? '';
-      if (errMsg.includes('LOJA_ENCERRADA')) {
         return {
           ok: false,
-          status: 'store_closed',
+          status: classified.status,
           orderNumber,
           errorCode: rpcRes.error.code,
           errorMessage:
-            errMsg.replace(/^LOJA_ENCERRADA:\s*/i, '').trim() ||
-            verification.storeSettings.closedMessage,
-        };
-      }
-      if (errMsg.includes('STOCK_INSUFICIENTE') || errMsg.includes('PRODUTO_INDISPONIVEL')) {
-        return {
-          ok: false,
-          status: 'stock_conflict',
-          orderNumber,
-          errorCode: rpcRes.error.code,
-          errorMessage: errMsg
-            .replace(/^(STOCK_INSUFICIENTE|PRODUTO_INDISPONIVEL):\s*/i, '')
-            .trim(),
-        };
-      }
-      if (rpcRes.error.code === '42501') {
-        if (typeof console !== 'undefined') {
-          console.error(
-            '[Bercali Store · Diagnóstico Encomenda] Permissão pendente na função create_storefront_order:',
-            rpcRes.error
-          );
-        }
-        return {
-          ok: false,
-          status: 'rls_blocked',
-          orderNumber,
-          errorCode: '42501',
-          errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
+            classified.isBusinessRule && classified.serverMessage
+              ? classified.serverMessage
+              : PUBLIC_MESSAGES.orderRegistrationTemporaryError,
+          verifiedSummary: effectiveSummary,
         };
       }
 
-      if (typeof console !== 'undefined') {
-        console.error('[Bercali Store · Diagnóstico Encomenda] Erro RPC:', rpcRes.error);
-      }
-      return {
-        ok: false,
-        status: 'error',
-        orderNumber,
-        errorCode: rpcRes.error.code,
-        errorMessage: PUBLIC_MESSAGES.orderRegistrationTemporaryError,
-      };
-    } catch (thrownError) {
-      if (typeof console !== 'undefined') {
-        console.error(
-          '[Bercali Store · Diagnóstico Encomenda] Falha de rede ao submeter encomenda:',
-          thrownError
+      // Caso a função devolva erro de negócio estruturado em JSON com HTTP 200
+      if (
+        typeof rpcRes.data === 'object' &&
+        rpcRes.data !== null &&
+        !Array.isArray(rpcRes.data) &&
+        ((rpcRes.data as Record<string, unknown>).ok === false ||
+          (rpcRes.data as Record<string, unknown>).success === false)
+      ) {
+        activeOrderIdempotencyKeys.delete(submissionSignature);
+        const errPayload = rpcRes.data as Record<string, unknown>;
+        const payloadCode =
+          typeof errPayload.code === 'string' ? errPayload.code : 'BUSINESS_RULE_ERROR';
+        const payloadMsg =
+          typeof errPayload.message === 'string'
+            ? errPayload.message
+            : typeof errPayload.error === 'string'
+            ? errPayload.error
+            : '';
+        const payloadDetails =
+          typeof errPayload.details === 'string' ? errPayload.details : null;
+
+        if (typeof console !== 'undefined') {
+          console.error('[Bercali Store · Checkout RPC Error]', {
+            code: payloadCode,
+            message: payloadMsg || null,
+            details: payloadDetails,
+          });
+        }
+
+        const classified = classifyCheckoutRpcError(
+          { code: payloadCode, message: payloadMsg, details: payloadDetails },
+          effectiveStoreSettings.closedMessage
         );
+
+        return {
+          ok: false,
+          status: classified.status,
+          orderNumber,
+          errorCode: payloadCode,
+          errorMessage:
+            classified.isBusinessRule && classified.serverMessage
+              ? classified.serverMessage
+              : PUBLIC_MESSAGES.orderRegistrationTemporaryError,
+          verifiedSummary: effectiveSummary,
+        };
+      }
+
+      const resolved = extractRpcResultDetails(rpcRes.data, orderNumber, fallbackOrderId);
+
+      const successResult: OrderSubmissionResult = {
+        ok: true,
+        status: 'saved',
+        orderNumber: resolved.orderNumber,
+        orderId: resolved.orderId,
+        verifiedSummary: effectiveSummary,
+      };
+      completedOrderSubmissions.set(submissionSignature, successResult);
+      return successResult;
+    } catch (thrownError) {
+      const thrownMessage =
+        thrownError instanceof Error
+          ? thrownError.message
+          : typeof thrownError === 'string'
+          ? thrownError
+          : 'Erro de ligação desconhecido';
+      if (typeof console !== 'undefined') {
+        console.error('[Bercali Store · Checkout RPC Error]', {
+          code: 'NETWORK_ERROR',
+          message: thrownMessage,
+          details: null,
+        });
       }
       return {
         ok: false,
@@ -839,10 +861,11 @@ export async function submitOrderToSupabase(
         errorMessage: PUBLIC_MESSAGES.orderRegistrationNetworkError,
       };
     } finally {
-      inFlightOrderSubmissions.delete(idempotencyKey);
+      inFlightOrderSubmissions.delete(submissionSignature);
     }
   })();
 
-  inFlightOrderSubmissions.set(idempotencyKey, executionPromise);
+  inFlightOrderSubmissions.set(submissionSignature, executionPromise);
   return executionPromise;
 }
+

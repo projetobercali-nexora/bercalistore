@@ -667,9 +667,16 @@ function parseDeliveryRulesArray(rawList: unknown): DeliveryFeeRule[] {
       rec.feeKz ?? rec.fee_kz ?? rec.fee ?? rec.price ?? rec.rate ?? rec.amount ?? rec.cost
     );
 
+    const rawRuleId =
+      toCleanString(rec.id) ??
+      toCleanString(rec.zone_id) ??
+      toCleanString(rec.zoneId) ??
+      undefined;
+
     const effectiveProvince = rawProvince || rawZoneName || '';
     if (effectiveProvince && fee !== null && fee >= 0) {
       parsedRules.push({
+        ...(rawRuleId ? { id: rawRuleId } : {}),
         province: effectiveProvince,
         municipality: rawMunicipality,
         neighborhood: rawNeighborhood,
@@ -1601,3 +1608,265 @@ export function buildSupabaseOrderPayloads(params: {
 
   return { customerRow, orderRow, orderItemRows };
 }
+
+export interface CreateStorefrontOrderRpcItem {
+  productId: string;
+  quantity: number;
+}
+
+export interface CreateStorefrontOrderRpcArgs {
+  p_customer_name: string;
+  p_customer_phone: string;
+  p_customer_email: string | null;
+  p_customer_city: string;
+  p_delivery_address: string;
+  p_delivery_zone_id: string | null;
+  p_delivery_fee: number;
+  p_customer_notes: string;
+  p_source: 'whatsapp_store';
+  p_idempotency_key: string;
+  p_items: CreateStorefrontOrderRpcItem[];
+}
+
+export function resolveCheckoutDeliveryZoneId(
+  customer: CustomerCheckoutData,
+  deliveryZones: readonly DeliveryFeeRule[] = []
+): string | null {
+  const directId = toCleanString(customer.deliveryZoneId);
+  if (directId) {
+    return directId;
+  }
+
+  const chosenZone = toCleanString(customer.deliveryZone)?.toLowerCase();
+  if (!chosenZone || deliveryZones.length === 0) {
+    return null;
+  }
+
+  for (const rule of deliveryZones) {
+    if (!rule.id) continue;
+    const ruleIdClean = toCleanString(rule.id);
+    if (!ruleIdClean) continue;
+
+    const zoneNameLower = (rule.zoneName ?? '').trim().toLowerCase();
+    const compositeLabelLower = [rule.province, rule.municipality, rule.neighborhood]
+      .map((p) => (p ?? '').trim())
+      .filter(Boolean)
+      .join(' · ')
+      .toLowerCase();
+
+    if (chosenZone === zoneNameLower || chosenZone === compositeLabelLower) {
+      return ruleIdClean;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Constrói os parâmetros EXATOS esperados pela função RPC `create_storefront_order` no Supabase.
+ */
+export function buildCreateStorefrontOrderRpcArgs(params: {
+  customer: CustomerCheckoutData;
+  summary: OrderSummaryCalculation;
+  idempotencyKey: string;
+  deliveryZones?: readonly DeliveryFeeRule[];
+}): CreateStorefrontOrderRpcArgs {
+  const { customer, summary, idempotencyKey, deliveryZones = [] } = params;
+
+  const cleanEmail = (customer.email ?? '').trim();
+  const resolvedEmail = cleanEmail && isValidEmailAddress(cleanEmail) ? cleanEmail : null;
+
+  const resolvedCity =
+    [customer.municipality.trim(), customer.province.trim()].filter(Boolean).join(', ') ||
+    (customer.deliveryZone ?? '').trim() ||
+    'Angola';
+
+  const formattedAddress = formatOrderDeliveryAddress(customer).trim();
+  const resolvedAddress =
+    formattedAddress.length >= 3 ? formattedAddress : 'A confirmar pelo WhatsApp';
+
+  const rawDeliveryFee = summary.delivery.known ? summary.delivery.amountKz : 0;
+  const resolvedDeliveryFee =
+    typeof rawDeliveryFee === 'number' && Number.isFinite(rawDeliveryFee) && rawDeliveryFee >= 0
+      ? rawDeliveryFee
+      : 0;
+
+  const resolvedZoneId = resolveCheckoutDeliveryZoneId(customer, deliveryZones);
+  const resolvedKey = idempotencyKey.trim() || generateUuid();
+
+  const items: CreateStorefrontOrderRpcItem[] = summary.lines.map((line) => ({
+    productId: String(line.product.id).trim(),
+    quantity: Math.max(1, Math.trunc(line.quantity)),
+  }));
+
+  return {
+    p_customer_name: customer.fullName.trim(),
+    p_customer_phone: customer.phone.trim(),
+    p_customer_email: resolvedEmail,
+    p_customer_city: resolvedCity,
+    p_delivery_address: resolvedAddress,
+    p_delivery_zone_id: resolvedZoneId,
+    p_delivery_fee: resolvedDeliveryFee,
+    p_customer_notes: (customer.notes ?? '').trim(),
+    p_source: 'whatsapp_store',
+    p_idempotency_key: resolvedKey,
+    p_items: items,
+  };
+}
+
+const INTERNAL_INFRA_ERROR_CODES = new Set([
+  '42501',
+  '42883',
+  '42P01',
+  '42703',
+  '42601',
+  'XX000',
+  'PGRST200',
+  'PGRST202',
+  'PGRST204',
+  'PGRST205',
+  'PGRST301',
+  'PGRST302',
+]);
+
+const INTERNAL_INFRA_MESSAGE_PATTERNS: readonly RegExp[] = [
+  /\bpermission\s+denied\b/i,
+  /\brow-level\s+security\b/i,
+  /\bviolates\s+row-level\s+security\b/i,
+  /\bcould\s+not\s+find\s+the\s+function\b/i,
+  /\bschema\s+cache\b/i,
+  /\brelation\s+["']?[\w.]+["']?\s+does\s+not\s+exist\b/i,
+  /\bcolumn\s+["']?[\w.]+["']?\s+does\s+not\s+exist\b/i,
+  /\bfunction\s+[\w.]+\(.*\)\s+does\s+not\s+exist\b/i,
+  /\bsyntax\s+error\s+at\s+or\s+near\b/i,
+  /\binvalid\s+input\s+syntax\s+for\s+type\b/i,
+  /\bnull\s+value\s+in\s+column\b/i,
+  /\bviolates\s+(foreign\s+key|not-null|unique)\s+constraint\b/i,
+  /\binvalid\s+api\s+key\b/i,
+  /\bjwt\s+expired\b/i,
+  /\bservice_role\b/i,
+  /\bcreate_storefront_order\b/i,
+];
+
+const STORE_CLOSED_PATTERNS: readonly RegExp[] = [
+  /^LOJA_ENCERRADA\b/i,
+  /^STORE_CLOSED\b/i,
+  /\bloja\s+(est[aá]\s+|encontra-se\s+|temporariamente\s+)?(encerrad[oa]|fechad[oa]|inativ[oa]|indispon[ií]vel)\b/i,
+  /\bencomendas?\s+(suspensas?|encerradas?|fechadas?|indispon[ií]veis|desativadas?)\b/i,
+  /\bstore\s+(is\s+)?(currently\s+|temporarily\s+)?closed\b/i,
+];
+
+const STOCK_OR_UNAVAILABLE_PATTERNS: readonly RegExp[] = [
+  /^(STOCK_INSUFICIENTE|OUT_OF_STOCK|PRODUTO_INDISPONIVEL|PRODUCT_UNAVAILABLE|PRODUCT_NOT_FOUND)\b/i,
+  /\bstock\b/i,
+  /\besgotad[oa]s?\b/i,
+  /\binsuficientes?\b/i,
+  /\bindispon[ií]ve(l|is)\b/i,
+  /\b(produto|artigo|item)s?\s+(n[aã]o\s+encontrad[oa]s?|inativ[oa]s?|arquivad[oa]s?|sem\s+stock|ocult[oa]s?)\b/i,
+  /\bn[aã]o\s+encontrad[oa]s?\b/i,
+  /\bout\s+of\s+stock\b/i,
+  /\binsufficient\s+stock\b/i,
+  /\bproduct\s+(not\s+found|is\s+unavailable|unavailable|inactive)\b/i,
+];
+
+const INVALID_DATA_PATTERNS: readonly RegExp[] = [
+  /^(DADOS_INVALIDOS|VALIDATION_ERROR|INVALID_INPUT|ZONA_INVALIDA|INVALID_DATA)\b/i,
+  /\binv[aá]lid[oa]s?\b/i,
+  /\bobrigat[oó]ri[oa]s?\b/i,
+  /\bm[ií]nimo\b/i,
+  /\bm[aá]ximo\b/i,
+  /\bcaracter(es)?\b/i,
+  /\b(preench[ae]|inform[ae]|indic[ae]|selecion[ae]|introduz[ae]?)\b/i,
+  /\b(nome|telefone|telem[oó]vel|contacto|e-?mail|endere[cç]o|morada|cidade|zona|entrega|quantidade|itens|carrinho)\b/i,
+  /\b(invalid|required|must\s+have|must\s+be|at\s+least|cannot\s+be\s+empty)\b/i,
+];
+
+function stripBusinessErrorCodePrefix(rawMessage: string): string {
+  return rawMessage.replace(/^[A-Z][A-Z0-9_]{2,}:\s*/, '').trim();
+}
+
+export interface ClassifiedCheckoutRpcError {
+  status: 'store_closed' | 'stock_conflict' | 'rls_blocked' | 'error';
+  isBusinessRule: boolean;
+  serverMessage: string | null;
+}
+
+/**
+ * Classifica erros devolvidos por `create_storefront_order`:
+ * - Expõe no ecrã a mensagem do servidor sempre que se tratar de regra de negócio
+ *   (stock, produto indisponível, loja encerrada, dados inválidos).
+ * - Oculta erros internos de SQL/permissões/esquema para nunca expor detalhes técnicos ao cliente.
+ */
+export function classifyCheckoutRpcError(
+  error: { code?: string | null; message?: string | null; details?: string | null },
+  fallbackClosedMessage?: string
+): ClassifiedCheckoutRpcError {
+  const code = (error.code ?? '').trim().toUpperCase();
+  const rawMessage = (error.message ?? '').trim();
+  const rawDetails = (error.details ?? '').trim();
+  const combinedRaw = [rawMessage, rawDetails].filter(Boolean).join(' ');
+
+  if (
+    code === '42501' ||
+    /\bpermission\s+denied\b|\brow-level\s+security\b|\bviolates\s+row-level\s+security\b/i.test(
+      combinedRaw
+    )
+  ) {
+    return {
+      status: 'rls_blocked',
+      isBusinessRule: false,
+      serverMessage: null,
+    };
+  }
+
+  if (
+    INTERNAL_INFRA_ERROR_CODES.has(code) ||
+    INTERNAL_INFRA_MESSAGE_PATTERNS.some((regex) => regex.test(combinedRaw))
+  ) {
+    return {
+      status: 'error',
+      isBusinessRule: false,
+      serverMessage: null,
+    };
+  }
+
+  const cleanedMessage = stripBusinessErrorCodePrefix(rawMessage);
+
+  if (STORE_CLOSED_PATTERNS.some((regex) => regex.test(rawMessage))) {
+    return {
+      status: 'store_closed',
+      isBusinessRule: true,
+      serverMessage: cleanedMessage || fallbackClosedMessage || 'A loja encontra-se encerrada de momento.',
+    };
+  }
+
+  if (STOCK_OR_UNAVAILABLE_PATTERNS.some((regex) => regex.test(rawMessage))) {
+    return {
+      status: 'stock_conflict',
+      isBusinessRule: true,
+      serverMessage:
+        cleanedMessage || 'Um ou mais produtos selecionados não têm stock ou disponibilidade suficiente.',
+    };
+  }
+
+  const isExplicitBusinessCode =
+    code === 'P0001' || code === 'P0002' || code === '22023' || code === '23514';
+
+  if (
+    cleanedMessage &&
+    (isExplicitBusinessCode || INVALID_DATA_PATTERNS.some((regex) => regex.test(rawMessage)))
+  ) {
+    return {
+      status: 'error',
+      isBusinessRule: true,
+      serverMessage: cleanedMessage,
+    };
+  }
+
+  return {
+    status: 'error',
+    isBusinessRule: false,
+    serverMessage: null,
+  };
+}
+

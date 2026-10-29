@@ -56,6 +56,7 @@ export interface CustomerCheckoutData {
   phone: string;
   email?: string;
   deliveryZone?: string;
+  deliveryZoneId?: string | null;
   province: string;
   municipality: string;
   neighborhood: string;
@@ -66,6 +67,7 @@ export interface CustomerCheckoutData {
 export type CheckoutValidationErrors = Partial<Record<keyof CustomerCheckoutData, string>>;
 
 export interface DeliveryFeeRule {
+  id?: string;
   province: string;
   municipality?: string;
   neighborhood?: string;

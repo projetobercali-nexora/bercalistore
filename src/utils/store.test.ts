@@ -33,8 +33,10 @@ import {
 import {
   applyFeaturedSelection,
   attachRelationsToProducts,
+  buildCreateStorefrontOrderRpcArgs,
   buildStoreCategories,
   buildSupabaseOrderPayloads,
+  classifyCheckoutRpcError,
   extractPublicStoreSettings,
   extractWhatsAppFromSettings,
   isPublishedProductRow,
@@ -872,6 +874,160 @@ test('validateCheckoutForm in storefront mode requires name, phone, and zone onl
   );
   assert.equal(hasValidationErrors(validWithZoneErrors), false);
 });
+
+test('buildCreateStorefrontOrderRpcArgs builds exact parameter names, UUID productId, integer quantity, and min-3-char address', () => {
+  const lines = resolveValidatedCartLines(
+    [{ productId: TEST_CATALOG[0].id, quantity: 3 }],
+    TEST_CATALOG
+  );
+  const zones = [
+    {
+      id: 'zone-uuid-talatona',
+      zoneName: 'Talatona',
+      province: 'Luanda',
+      feeKz: 2500,
+    },
+  ];
+  const summaryWithZone = calculateOrderSummary(lines, 'Luanda', '', zones, {
+    deliveryZone: 'Talatona',
+  });
+
+  const rpcArgs = buildCreateStorefrontOrderRpcArgs({
+    customer: {
+      fullName: '  João Baptista  ',
+      phone: ' 923 111 222 ',
+      email: '  joao@exemplo.ao ',
+      deliveryZone: 'Talatona',
+      province: 'Luanda',
+      municipality: 'Belas',
+      neighborhood: 'Talatona',
+      addressReference: 'Rua 10, Casa 4',
+      notes: '  Entregar de manhã ',
+    },
+    summary: summaryWithZone,
+    idempotencyKey: 'BRC-20261029-1234-uniq1',
+    deliveryZones: zones,
+  });
+
+  assert.deepEqual(Object.keys(rpcArgs).sort(), [
+    'p_customer_city',
+    'p_customer_email',
+    'p_customer_name',
+    'p_customer_notes',
+    'p_customer_phone',
+    'p_delivery_address',
+    'p_delivery_fee',
+    'p_delivery_zone_id',
+    'p_idempotency_key',
+    'p_items',
+    'p_source',
+  ]);
+
+  assert.equal(rpcArgs.p_customer_name, 'João Baptista');
+  assert.equal(rpcArgs.p_customer_phone, '923 111 222');
+  assert.equal(rpcArgs.p_customer_email, 'joao@exemplo.ao');
+  assert.equal(rpcArgs.p_customer_city, 'Belas, Luanda');
+  assert.ok(rpcArgs.p_delivery_address.length >= 3);
+  assert.equal(rpcArgs.p_delivery_zone_id, 'zone-uuid-talatona');
+  assert.equal(typeof rpcArgs.p_delivery_fee, 'number');
+  assert.equal(rpcArgs.p_delivery_fee, 2500);
+  assert.equal(rpcArgs.p_customer_notes, 'Entregar de manhã');
+  assert.equal(rpcArgs.p_source, 'whatsapp_store');
+  assert.equal(rpcArgs.p_idempotency_key, 'BRC-20261029-1234-uniq1');
+
+  assert.equal(rpcArgs.p_items.length, 1);
+  assert.deepEqual(Object.keys(rpcArgs.p_items[0]), ['productId', 'quantity']);
+  assert.equal(rpcArgs.p_items[0].productId, '11111111-1111-4111-8111-111111111111');
+  assert.notEqual(rpcArgs.p_items[0].productId, TEST_CATALOG[0].sku);
+  assert.equal(rpcArgs.p_items[0].quantity, 3);
+  assert.equal(Number.isInteger(rpcArgs.p_items[0].quantity), true);
+
+  // Sem campos opcionais nem zona: email e zone_id são null, e morada mantém mínimo de 3 caracteres
+  const minimalSummary = calculateOrderSummary(lines, '', '', []);
+  const minimalArgs = buildCreateStorefrontOrderRpcArgs({
+    customer: {
+      fullName: 'Maria Silva',
+      phone: '924000999',
+      email: '',
+      deliveryZone: '',
+      province: '',
+      municipality: '',
+      neighborhood: '',
+      addressReference: '',
+      notes: '',
+    },
+    summary: minimalSummary,
+    idempotencyKey: 'BRC-20261029-5678-uniq2',
+    deliveryZones: [],
+  });
+
+  assert.equal(minimalArgs.p_customer_email, null);
+  assert.equal(minimalArgs.p_delivery_zone_id, null);
+  assert.equal(minimalArgs.p_delivery_fee, 0);
+  assert.equal(minimalArgs.p_customer_notes, '');
+  assert.equal(minimalArgs.p_source, 'whatsapp_store');
+  assert.ok(minimalArgs.p_delivery_address.length >= 3);
+});
+
+test('classifyCheckoutRpcError surfaces server business-rule messages and hides internal SQL/RLS errors', () => {
+  const stockErr = classifyCheckoutRpcError({
+    code: 'P0001',
+    message: 'Stock insuficiente para Carregador Solar (disponível: 1).',
+    details: null,
+  });
+  assert.equal(stockErr.isBusinessRule, true);
+  assert.equal(stockErr.status, 'stock_conflict');
+  assert.equal(stockErr.serverMessage, 'Stock insuficiente para Carregador Solar (disponível: 1).');
+
+  const unavailErr = classifyCheckoutRpcError({
+    code: 'P0001',
+    message: 'PRODUTO_INDISPONIVEL: O artigo selecionado já não está disponível.',
+    details: null,
+  });
+  assert.equal(unavailErr.isBusinessRule, true);
+  assert.equal(unavailErr.status, 'stock_conflict');
+  assert.equal(unavailErr.serverMessage, 'O artigo selecionado já não está disponível.');
+
+  const closedErr = classifyCheckoutRpcError({
+    code: 'P0001',
+    message: 'A loja encontra-se encerrada neste momento.',
+    details: null,
+  });
+  assert.equal(closedErr.isBusinessRule, true);
+  assert.equal(closedErr.status, 'store_closed');
+  assert.equal(closedErr.serverMessage, 'A loja encontra-se encerrada neste momento.');
+
+  const invalidDataErr = classifyCheckoutRpcError({
+    code: '22023',
+    message: 'O endereço de entrega deve ter pelo menos 3 caracteres.',
+    details: null,
+  });
+  assert.equal(invalidDataErr.isBusinessRule, true);
+  assert.equal(invalidDataErr.status, 'error');
+  assert.equal(
+    invalidDataErr.serverMessage,
+    'O endereço de entrega deve ter pelo menos 3 caracteres.'
+  );
+
+  // Erros técnicos de esquema ou permissões RLS não expõem detalhes internos no ecrã
+  const rlsErr = classifyCheckoutRpcError({
+    code: '42501',
+    message: 'permission denied for function create_storefront_order',
+    details: null,
+  });
+  assert.equal(rlsErr.isBusinessRule, false);
+  assert.equal(rlsErr.status, 'rls_blocked');
+  assert.equal(rlsErr.serverMessage, null);
+
+  const missingFnErr = classifyCheckoutRpcError({
+    code: 'PGRST202',
+    message: 'Could not find the function public.create_storefront_order in the schema cache',
+    details: null,
+  });
+  assert.equal(missingFnErr.isBusinessRule, false);
+  assert.equal(missingFnErr.serverMessage, null);
+});
+
 
 
 
