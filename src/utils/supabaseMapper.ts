@@ -749,15 +749,52 @@ export function extractPublicStoreSettings(
     if (web) result.socialLinks.website = web;
   };
 
-  const applyObjectSettings = (obj: Record<string, unknown>, groupKey: string) => {
+  const applyObjectSettings = (
+    obj: Record<string, unknown>,
+    groupKey: string,
+    depth = 0
+  ) => {
+    // Suporte para perfis aninhados (ex.: `company_profile`, `whatsapp_settings`, `checkout_settings`)
+    if (depth < 2) {
+      const nestedGroupEntries: Array<[string, unknown]> = [
+        ['company_profile', obj.company_profile ?? obj.companyProfile ?? obj.store_profile ?? obj.storeProfile],
+        ['general', obj.general ?? obj.general_settings ?? obj.generalSettings],
+        ['whatsapp_settings', obj.whatsapp_settings ?? obj.whatsappSettings],
+        ['checkout', obj.checkout_settings ?? obj.checkoutSettings ?? obj.order_settings ?? obj.orderSettings],
+        ['delivery_settings', obj.delivery_settings ?? obj.deliverySettings],
+      ];
+      for (const [nestedKey, nestedRaw] of nestedGroupEntries) {
+        const parsedNested = parseMaybeJson(nestedRaw);
+        if (
+          typeof parsedNested === 'object' &&
+          parsedNested !== null &&
+          !Array.isArray(parsedNested)
+        ) {
+          applyObjectSettings(parsedNested as Record<string, unknown>, nestedKey, depth + 1);
+        }
+      }
+    }
+
     // Identidade comercial e logótipo
     const nameCandidate =
       toCleanString(obj.store_name) ??
       toCleanString(obj.storeName) ??
+      toCleanString(obj.company_name) ??
+      toCleanString(obj.companyName) ??
+      toCleanString(obj.business_name) ??
+      toCleanString(obj.businessName) ??
       toCleanString(obj.brand_name) ??
       toCleanString(obj.brandName) ??
       toCleanString(obj.commercial_name) ??
-      (groupKey === 'general' || groupKey === 'store' || groupKey === 'store_info' || groupKey === 'branding'
+      toCleanString(obj.commercialName) ??
+      toCleanString(obj.trade_name) ??
+      toCleanString(obj.tradeName) ??
+      (groupKey === 'company_profile' ||
+      groupKey === 'company' ||
+      groupKey === 'general' ||
+      groupKey === 'store' ||
+      groupKey === 'store_info' ||
+      groupKey === 'branding'
         ? toCleanString(obj.name)
         : null);
     if (nameCandidate) {
@@ -773,7 +810,11 @@ export function extractPublicStoreSettings(
     const descCandidate =
       toCleanString(obj.store_description) ??
       toCleanString(obj.commercial_description) ??
-      (groupKey === 'general' || groupKey === 'store' || groupKey === 'store_info'
+      (groupKey === 'company_profile' ||
+      groupKey === 'company' ||
+      groupKey === 'general' ||
+      groupKey === 'store' ||
+      groupKey === 'store_info'
         ? toCleanString(obj.description)
         : null);
     if (descCandidate) {
@@ -781,7 +822,7 @@ export function extractPublicStoreSettings(
     }
 
     const logoCandidate = resolvePublicAssetUrl(
-      obj.logo_url ?? obj.logoUrl ?? obj.store_logo ?? obj.logo,
+      obj.logo_url ?? obj.logoUrl ?? obj.store_logo ?? obj.storeLogo ?? obj.logo,
       supabaseUrl
     );
     if (logoCandidate) {
@@ -827,25 +868,43 @@ export function extractPublicStoreSettings(
       result.closedMessage = closedMsg;
     }
 
-    // Contactos: WhatsApp, Modelo de Mensagem, Telefone, E-mail e Morada
+    // Contactos: WhatsApp (incluindo company_profile), Modelo de Mensagem, Telefone, E-mail e Morada
+    const nestedWaObj =
+      typeof obj.whatsapp === 'object' && obj.whatsapp !== null && !Array.isArray(obj.whatsapp)
+        ? (obj.whatsapp as Record<string, unknown>)
+        : typeof obj.whatsApp === 'object' && obj.whatsApp !== null && !Array.isArray(obj.whatsApp)
+        ? (obj.whatsApp as Record<string, unknown>)
+        : null;
+
     const whatsappFields = [
-      obj.whatsapp,
+      nestedWaObj ? nestedWaObj.number ?? nestedWaObj.phone ?? nestedWaObj.value : obj.whatsapp,
+      nestedWaObj ? undefined : obj.whatsApp,
       obj.whatsapp_number,
       obj.whatsappNumber,
-      obj.store_whatsapp,
-      obj.support_whatsapp,
-      obj.contact_whatsapp,
+      obj.whatsAppNumber,
       obj.whatsapp_phone,
+      obj.whatsappPhone,
+      obj.whatsAppPhone,
+      obj.phone_whatsapp,
+      obj.phoneWhatsapp,
+      obj.store_whatsapp,
+      obj.storeWhatsapp,
+      obj.support_whatsapp,
+      obj.supportWhatsapp,
+      obj.contact_whatsapp,
+      obj.contactWhatsapp,
+      obj.whatsapp_contact,
+      obj.whatsappContact,
     ];
     const hasExplicitWaField = whatsappFields.some((v) => v !== undefined);
-    const waCandidate =
-      normalizePhoneCandidate(obj.whatsapp) ??
-      normalizePhoneCandidate(obj.whatsapp_number) ??
-      normalizePhoneCandidate(obj.whatsappNumber) ??
-      normalizePhoneCandidate(obj.store_whatsapp) ??
-      normalizePhoneCandidate(obj.support_whatsapp) ??
-      normalizePhoneCandidate(obj.contact_whatsapp) ??
-      normalizePhoneCandidate(obj.whatsapp_phone);
+    let waCandidate: string | null = null;
+    for (const candidateVal of whatsappFields) {
+      const normalized = normalizePhoneCandidate(candidateVal);
+      if (normalized) {
+        waCandidate = normalized;
+        break;
+      }
+    }
 
     if (waCandidate) {
       result.whatsappNumber = waCandidate;
@@ -858,12 +917,20 @@ export function extractPublicStoreSettings(
     const msgTemplateCandidate =
       toCleanString(obj.whatsapp_message_template) ??
       toCleanString(obj.whatsappMessageTemplate) ??
+      toCleanString(obj.whatsAppMessageTemplate) ??
       toCleanString(obj.whatsapp_template) ??
       toCleanString(obj.whatsappTemplate) ??
+      toCleanString(obj.whatsAppTemplate) ??
       toCleanString(obj.whatsapp_message) ??
       toCleanString(obj.whatsappMessage) ??
+      toCleanString(obj.whatsAppMessage) ??
       toCleanString(obj.default_whatsapp_message) ??
+      toCleanString(obj.defaultWhatsappMessage) ??
       toCleanString(obj.whatsapp_greeting) ??
+      toCleanString(obj.whatsappGreeting) ??
+      toCleanString(obj.message_template) ??
+      toCleanString(obj.messageTemplate) ??
+      (nestedWaObj ? toCleanString(nestedWaObj.message_template ?? nestedWaObj.messageTemplate ?? nestedWaObj.template ?? nestedWaObj.message) : null) ??
       (groupKey === 'whatsapp' || groupKey === 'whatsapp_settings'
         ? toCleanString(obj.message ?? obj.template ?? obj.greeting)
         : null);
@@ -874,12 +941,20 @@ export function extractPublicStoreSettings(
     const orderTemplateCandidate =
       toCleanString(obj.whatsapp_order_template) ??
       toCleanString(obj.whatsappOrderTemplate) ??
+      toCleanString(obj.whatsAppOrderTemplate) ??
       toCleanString(obj.order_whatsapp_template) ??
+      toCleanString(obj.orderWhatsappTemplate) ??
       toCleanString(obj.checkout_whatsapp_template) ??
+      toCleanString(obj.checkoutWhatsappTemplate) ??
       toCleanString(obj.order_message_template) ??
+      toCleanString(obj.orderMessageTemplate) ??
+      toCleanString(obj.checkout_message_template) ??
+      toCleanString(obj.checkoutMessageTemplate) ??
       toCleanString(obj.whatsapp_checkout_message) ??
+      toCleanString(obj.whatsappCheckoutMessage) ??
+      (nestedWaObj ? toCleanString(nestedWaObj.order_template ?? nestedWaObj.orderTemplate ?? nestedWaObj.checkout_template ?? nestedWaObj.checkoutTemplate) : null) ??
       (groupKey === 'whatsapp' || groupKey === 'whatsapp_settings' || groupKey === 'checkout'
-        ? toCleanString(obj.order_template ?? obj.checkout_template)
+        ? toCleanString(obj.order_template ?? obj.orderTemplate ?? obj.checkout_template ?? obj.checkoutTemplate)
         : null);
     if (orderTemplateCandidate) {
       result.whatsappOrderTemplate = orderTemplateCandidate;
@@ -887,24 +962,25 @@ export function extractPublicStoreSettings(
 
     const phoneDisplay =
       normalizeDisplayPhone(obj.phone) ??
+      normalizeDisplayPhone(obj.phone_number) ??
+      normalizeDisplayPhone(obj.phoneNumber) ??
       normalizeDisplayPhone(obj.contact_phone) ??
+      normalizeDisplayPhone(obj.contactPhone) ??
       normalizeDisplayPhone(obj.telephone) ??
-      normalizeDisplayPhone(obj.store_phone);
+      normalizeDisplayPhone(obj.store_phone) ??
+      normalizeDisplayPhone(obj.storePhone);
     if (phoneDisplay) {
       result.phone = phoneDisplay;
-      if (explicitWhatsappState === 'unset') {
-        const fallbackWa = normalizePhoneCandidate(phoneDisplay);
-        if (fallbackWa) {
-          result.whatsappNumber = fallbackWa;
-        }
-      }
     }
 
     const emailCandidate =
       toCleanString(obj.email) ??
       toCleanString(obj.contact_email) ??
+      toCleanString(obj.contactEmail) ??
       toCleanString(obj.store_email) ??
-      toCleanString(obj.support_email);
+      toCleanString(obj.storeEmail) ??
+      toCleanString(obj.support_email) ??
+      toCleanString(obj.supportEmail);
     if (emailCandidate && isValidEmailAddress(emailCandidate)) {
       result.email = emailCandidate;
     }
@@ -912,6 +988,7 @@ export function extractPublicStoreSettings(
     const addressCandidate =
       toCleanString(obj.address) ??
       toCleanString(obj.store_address) ??
+      toCleanString(obj.storeAddress) ??
       toCleanString(obj.location);
     if (addressCandidate) {
       result.address = addressCandidate;
@@ -1042,8 +1119,17 @@ export function extractPublicStoreSettings(
   for (const row of rows) {
     if (typeof row !== 'object' || row === null) continue;
 
-    // Suporte para tabelas `store_settings` com colunas diretas (sem `setting_key`)
-    if (typeof row.setting_key !== 'string') {
+    const rawRowKey =
+      typeof row.setting_key === 'string'
+        ? row.setting_key
+        : typeof row.key === 'string'
+        ? row.key
+        : typeof row.config_key === 'string'
+        ? row.config_key
+        : null;
+
+    // Suporte para tabelas `store_settings` com colunas diretas (ex.: coluna JSONB `company_profile`)
+    if (rawRowKey === null) {
       const sanitizedFlatRow: Record<string, unknown> = {};
       for (const [colKey, colVal] of Object.entries(row)) {
         const lk = colKey.toLowerCase();
@@ -1056,7 +1142,7 @@ export function extractPublicStoreSettings(
       continue;
     }
 
-    const key = row.setting_key.trim().toLowerCase();
+    const key = rawRowKey.trim().toLowerCase();
     if (!key) continue;
 
     // Ignorar explicitamente chaves internas/marketing privadas
@@ -1064,7 +1150,13 @@ export function extractPublicStoreSettings(
       continue;
     }
 
-    const val = parseMaybeJson(row.setting_value);
+    const rawSettingVal =
+      row.setting_value !== undefined
+        ? row.setting_value
+        : row.value !== undefined
+        ? row.value
+        : row.config_value;
+    const val = parseMaybeJson(rawSettingVal);
 
     if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
       const obj = val as Record<string, unknown>;

@@ -837,6 +837,10 @@ export async function submitOrderToSupabase(
         orderNumber: resolved.orderNumber,
         orderId: resolved.orderId,
         verifiedSummary: effectiveSummary,
+        storeSettings:
+          !liveSettingsRes.error && Array.isArray(liveSettingsRes.data)
+            ? effectiveStoreSettings
+            : undefined,
       };
       completedOrderSubmissions.set(submissionSignature, successResult);
       return successResult;

@@ -47,9 +47,11 @@ export function normalizeWhatsAppNumber(raw: unknown): string {
     digits = digits.slice(2);
   }
 
-  // Número angolano de 9 dígitos (telemóvel 9xx xxx xxx ou fixo 2xx xxx xxx) -> prefixo internacional 244
+  // Número angolano de 9 dígitos (9xx... / 2xx...) ou 10 dígitos com zero inicial (09xx...) -> prefixo internacional 244
   if (digits.length === 9 && (digits.startsWith('9') || digits.startsWith('2'))) {
     digits = `244${digits}`;
+  } else if (digits.length === 10 && (digits.startsWith('09') || digits.startsWith('02'))) {
+    digits = `244${digits.slice(1)}`;
   } else if (digits.length === 13 && digits.startsWith('2440')) {
     digits = `244${digits.slice(4)}`;
   }
@@ -458,7 +460,9 @@ export function buildWhatsAppOrderMessage(
   const resolvedZoneSummary =
     cleanZone ||
     [cleanNeighborhood, cleanMunicipality, cleanProvince].filter(Boolean).join(', ') ||
-    'A confirmar';
+    DELIVERY_PENDING_LABEL;
+
+  const resolvedReferenceSummary = cleanAddress || 'A confirmar pelo WhatsApp';
 
   const trimmedTemplate = customTemplate?.trim() ?? '';
   let introGreeting = `Olá, ${cleanBrand}! Quero fazer uma encomenda.`;
@@ -468,49 +472,94 @@ export function buildWhatsAppOrderMessage(
       loja: cleanBrand,
       store: cleanBrand,
       store_name: cleanBrand,
+      brand: cleanBrand,
       codigo: cleanOrderNumber ?? '',
+      encomenda: cleanOrderNumber ?? '',
       order_number: cleanOrderNumber ?? '',
       order_code: cleanOrderNumber ?? '',
       pedido: cleanOrderNumber ?? '',
+      order_id: cleanOrderNumber ?? '',
       cliente: cleanName,
       nome: cleanName,
       customer_name: cleanName,
+      name: cleanName,
       telefone: cleanPhone,
+      telemovel: cleanPhone,
       phone: cleanPhone,
       customer_phone: cleanPhone,
       zona: resolvedZoneSummary,
+      zona_entrega: resolvedZoneSummary,
       delivery_zone: resolvedZoneSummary,
+      zone: resolvedZoneSummary,
+      referencia: resolvedReferenceSummary,
+      referencia_entrega: resolvedReferenceSummary,
       endereco: cleanAddress || resolvedZoneSummary,
+      morada: cleanAddress || resolvedZoneSummary,
       address: cleanAddress || resolvedZoneSummary,
+      delivery_address: cleanAddress || resolvedZoneSummary,
+      address_reference: resolvedReferenceSummary,
       itens: productBlocks,
       items: productBlocks,
       produtos: productBlocks,
       products: productBlocks,
+      lista_produtos: productBlocks,
       subtotal: formatKz(summary.productsSubtotalKz),
       entrega: summary.delivery.label,
+      taxa_entrega: summary.delivery.label,
       delivery_fee: summary.delivery.label,
+      shipping_fee: summary.delivery.label,
       total: totalLine,
+      valor_total: totalLine,
+      total_amount: totalLine,
       observacoes: cleanNotes,
+      notas: cleanNotes,
       notes: cleanNotes,
+      customer_notes: cleanNotes,
     });
 
-    const hasItemsToken = /\{\{?\s*(itens|items|produtos|products)\s*\}?\}/i.test(trimmedTemplate);
-    const hasTotalToken = /\{\{?\s*total\s*\}?\}/i.test(trimmedTemplate);
-
-    if (hasItemsToken && hasTotalToken) {
+    if (hasOrderSpecificTokens(trimmedTemplate)) {
+      const missingDetails: string[] = [];
       if (cleanOrderNumber && !interpolated.includes(cleanOrderNumber)) {
-        return `${interpolated}\n\nPedido nº: ${cleanOrderNumber}`;
+        missingDetails.push(`Pedido nº: ${cleanOrderNumber}`);
       }
-      return interpolated;
+      if (cleanName && !interpolated.includes(cleanName)) {
+        missingDetails.push(`Nome: ${cleanName}`);
+      }
+      if (cleanPhone && !interpolated.includes(cleanPhone)) {
+        missingDetails.push(`Telefone: ${cleanPhone}`);
+      }
+      if (!/\{\{?\s*(zona|zona_entrega|delivery_zone|zone)\s*\}?\}/i.test(trimmedTemplate)) {
+        missingDetails.push(`Zona de entrega: ${resolvedZoneSummary}`);
+      }
+      if (
+        !/\{\{?\s*(referencia|referencia_entrega|endereco|morada|address|delivery_address|address_reference)\s*\}?\}/i.test(
+          trimmedTemplate
+        )
+      ) {
+        missingDetails.push(`Referência de entrega: ${resolvedReferenceSummary}`);
+      }
+      if (!/\{\{?\s*(itens|items|produtos|products|lista_produtos)\s*\}?\}/i.test(trimmedTemplate)) {
+        missingDetails.push(`PRODUTOS\n${productBlocks}`);
+      }
+      if (
+        !/\{\{?\s*(entrega|taxa_entrega|delivery_fee|shipping_fee)\s*\}?\}/i.test(trimmedTemplate)
+      ) {
+        missingDetails.push(`Entrega: ${summary.delivery.label}`);
+      }
+      if (!/\{\{?\s*(total|valor_total|total_amount)\s*\}?\}/i.test(trimmedTemplate)) {
+        missingDetails.push(`Total estimado: ${totalLine}`);
+      }
+
+      return missingDetails.length > 0
+        ? `${interpolated}\n\n${missingDetails.join('\n')}`
+        : interpolated;
     }
 
-    if (!hasOrderSpecificTokens(trimmedTemplate)) {
-      introGreeting = interpolated;
-    }
+    introGreeting = interpolated;
   }
 
   const headerLines = [introGreeting];
-  if (cleanOrderNumber) {
+  if (cleanOrderNumber && !introGreeting.includes(cleanOrderNumber)) {
     headerLines.push(`Pedido nº: ${cleanOrderNumber}`);
   }
 
@@ -522,21 +571,17 @@ export function buildWhatsAppOrderMessage(
   if (cleanEmail) {
     customerLines.push(`E-mail: ${cleanEmail}`);
   }
-  if (cleanZone && cleanZone !== cleanProvince && cleanZone !== cleanMunicipality) {
-    customerLines.push(`Zona de entrega: ${cleanZone}`);
-  }
-  if (cleanProvince) {
+  customerLines.push(`Zona de entrega: ${resolvedZoneSummary}`);
+  if (cleanProvince && cleanProvince !== resolvedZoneSummary) {
     customerLines.push(`Província: ${cleanProvince}`);
   }
-  if (cleanMunicipality) {
+  if (cleanMunicipality && cleanMunicipality !== resolvedZoneSummary) {
     customerLines.push(`Município: ${cleanMunicipality}`);
   }
-  if (cleanNeighborhood) {
+  if (cleanNeighborhood && cleanNeighborhood !== resolvedZoneSummary) {
     customerLines.push(`Bairro: ${cleanNeighborhood}`);
   }
-  if (cleanAddress) {
-    customerLines.push(`Endereço/referência: ${cleanAddress}`);
-  }
+  customerLines.push(`Endereço/referência: ${resolvedReferenceSummary}`);
 
   return [
     ...headerLines,

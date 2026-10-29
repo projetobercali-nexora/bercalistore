@@ -156,21 +156,33 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         return;
       }
 
+      const activeSettings = res.storeSettings ?? storeSettings;
+      const finalBrandName = activeSettings.brandName || brandName;
+      const finalOrderTemplate =
+        activeSettings.whatsappOrderTemplate ??
+        activeSettings.whatsappMessageTemplate ??
+        orderTemplate;
+      const resolvedWhatsappNumber = res.storeSettings
+        ? res.storeSettings.whatsappNumber
+        : whatsappNumber;
+
       const finalOrderNumber = res.orderNumber || orderNumber;
       const finalSummary = res.verifiedSummary ?? summary;
       const finalMessage = buildWhatsAppOrderMessage(
         customer,
         finalSummary,
         finalOrderNumber,
-        brandName,
-        orderTemplate
+        finalBrandName,
+        finalOrderTemplate
       );
-      const finalWhatsappUrl = hasWhatsApp ? buildWhatsAppUrl(whatsappNumber, finalMessage) : '';
+      const finalWhatsappUrl = buildWhatsAppUrl(resolvedWhatsappNumber, finalMessage);
 
       savedSignatureRef.current = payloadSignature;
       setOrderNumber(finalOrderNumber);
       setPersistenceStatus('saved');
-      setPersistenceMessage(`Encomenda ${finalOrderNumber} registada com sucesso na ${brandName}.`);
+      setPersistenceMessage(
+        `Encomenda ${finalOrderNumber} registada com sucesso na ${finalBrandName}.`
+      );
 
       if (onOrderConfirmed) {
         onOrderConfirmed({

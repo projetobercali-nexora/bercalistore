@@ -56,16 +56,9 @@ const FIELD_ORDER: (keyof CustomerCheckoutData)[] = [
   'addressReference',
 ];
 
-function openExternalLinkInNewTab(url: string): void {
-  if (typeof document === 'undefined' || !url) return;
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
+function redirectToWhatsAppImmediately(url: string): void {
+  if (typeof window === 'undefined' || !url) return;
+  window.location.href = url;
 }
 
 export const CheckoutPage: React.FC = () => {
@@ -165,13 +158,13 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handleOrderConfirmed = (result: ConfirmedOrderResult) => {
-    setConfirmedOrder(result);
     clearCart();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setConfirmedOrder(result);
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     if (result.whatsappUrl) {
       trackMetaContact('Finalizar Compra WhatsApp');
-      openExternalLinkInNewTab(result.whatsappUrl);
+      redirectToWhatsAppImmediately(result.whatsappUrl);
     }
   };
 
@@ -223,23 +216,22 @@ export const CheckoutPage: React.FC = () => {
 
           <p className="text-sm text-[#8A8A8A] leading-relaxed">
             {confirmedOrder.whatsappUrl
-              ? `Abrimos o WhatsApp da ${brandName} com os produtos, quantidades, total em Kz e o código do teu pedido. Caso a janela não tenha aberto automaticamente, toca no botão abaixo.`
-              : `A tua encomenda ficou registada na ${brandName}. A nossa equipa entrará em contacto através do número indicado para confirmar a entrega.`}
+              ? `Estamos a encaminhar-te para o WhatsApp da ${brandName} com o resumo completo da tua encomenda. Caso não abra automaticamente, toca em "Abrir WhatsApp" abaixo.`
+              : 'Guarda o teu código; a nossa equipa vai contactar-te.'}
           </p>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 pt-1">
             {confirmedOrder.whatsappUrl && (
               <a
                 href={confirmedOrder.whatsappUrl}
-                target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => {
-                  trackMetaContact('Reabrir Pedido WhatsApp');
+                  trackMetaContact('Abrir WhatsApp Encomenda');
                 }}
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-3 font-display text-xs sm:text-sm font-extrabold uppercase text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99]"
               >
                 <MessageCircle className="h-4 w-4 shrink-0" />
-                <span>Enviar no WhatsApp</span>
+                <span>Abrir WhatsApp</span>
                 <ExternalLink className="h-4 w-4 shrink-0" />
               </a>
             )}

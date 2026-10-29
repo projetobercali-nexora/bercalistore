@@ -1028,6 +1028,100 @@ test('classifyCheckoutRpcError surfaces server business-rule messages and hides 
   assert.equal(missingFnErr.serverMessage, null);
 });
 
+test('company_profile in store_settings normalizes +244 WhatsApp link, applies template with all order fields, and stays blank when WhatsApp is empty', () => {
+  // 1. Key-value row `company_profile` com número local de 9 dígitos e modelo de mensagem
+  const kvCompanyProfile = extractPublicStoreSettings([
+    {
+      setting_key: 'company_profile',
+      setting_value: {
+        name: 'Bercali Store Oficial',
+        whatsapp: '923 777 888',
+        whatsappMessageTemplate: 'Olá {{loja}}! Segue o meu pedido confirmado:',
+      },
+    },
+  ]);
+  assert.equal(kvCompanyProfile.brandName, 'Bercali Store Oficial');
+  assert.equal(kvCompanyProfile.whatsappNumber, '244923777888');
+  assert.equal(
+    kvCompanyProfile.whatsappMessageTemplate,
+    'Olá Bercali Store Oficial! Segue o meu pedido confirmado:'.replace(
+      'Bercali Store Oficial',
+      '{{loja}}'
+    )
+  );
+
+  // 2. Linha colunar com JSONB `company_profile` e campos camelCase
+  const columnarCompanyProfile = extractPublicStoreSettings([
+    {
+      id: 'settings-1',
+      company_profile: {
+        companyName: 'Bercali Angola',
+        whatsappPhone: '+244 924 111 222',
+        orderMessageTemplate: 'Encomenda {{codigo}} — Cliente {{nome}} ({{telefone}})',
+      },
+    },
+  ]);
+  assert.equal(columnarCompanyProfile.brandName, 'Bercali Angola');
+  assert.equal(columnarCompanyProfile.whatsappNumber, '244924111222');
+
+  // 3. Quando WhatsApp está em branco em company_profile (mesmo que exista telefone geral), whatsappNumber fica vazio
+  const blankWaProfile = extractPublicStoreSettings([
+    {
+      setting_key: 'company_profile',
+      setting_value: {
+        name: 'Bercali Store',
+        whatsapp: '   ',
+        phone: '+244 222 000 111',
+      },
+    },
+  ]);
+  assert.equal(blankWaProfile.whatsappNumber, '');
+  assert.equal(buildWhatsAppUrl(blankWaProfile.whatsappNumber, 'Teste'), '');
+
+  // 4. Mensagem final contém obrigatoriamente: código, nome, telefone, zona e referência, produtos com quantidades e Kz, taxa de entrega e total
+  const lines = resolveValidatedCartLines(
+    [{ productId: TEST_CATALOG[0].id, quantity: 2 }],
+    TEST_CATALOG
+  );
+  const rules = [{ zoneName: 'Talatona', province: 'Luanda', feeKz: 2500 }];
+  const summary = calculateOrderSummary(lines, 'Luanda', 'Belas', rules, {
+    deliveryZone: 'Talatona',
+  });
+
+  const fullMsg = buildWhatsAppOrderMessage(
+    {
+      fullName: 'João Manuel',
+      phone: '923 555 444',
+      deliveryZone: 'Talatona',
+      province: 'Luanda',
+      municipality: 'Belas',
+      neighborhood: 'Talatona',
+      addressReference: 'Junto ao Belas Shopping',
+      notes: 'Ligar à chegada',
+    },
+    summary,
+    'ORD-2026-0099',
+    kvCompanyProfile.brandName,
+    kvCompanyProfile.whatsappMessageTemplate
+  );
+
+  assert.ok(fullMsg.includes('Olá Bercali Store Oficial! Segue o meu pedido confirmado:'));
+  assert.ok(fullMsg.includes('ORD-2026-0099'));
+  assert.ok(fullMsg.includes('João Manuel'));
+  assert.ok(fullMsg.includes('923 555 444'));
+  assert.ok(fullMsg.includes('Talatona'));
+  assert.ok(fullMsg.includes('Junto ao Belas Shopping'));
+  assert.ok(fullMsg.includes('Carregador Portátil Solar 20.000 mAh'));
+  assert.ok(fullMsg.includes('Quantidade: 2'));
+  assert.ok(fullMsg.includes('24.500 Kz'));
+  assert.ok(fullMsg.includes('2.500 Kz'));
+  assert.ok(fullMsg.includes('51.500 Kz'));
+
+  const waLink = buildWhatsAppUrl(kvCompanyProfile.whatsappNumber, fullMsg);
+  assert.ok(waLink.startsWith('https://wa.me/244923777888?text='));
+});
+
+
 
 
 

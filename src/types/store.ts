@@ -174,4 +174,5 @@ export interface OrderSubmissionResult {
   errorMessage?: string;
   errorCode?: string;
   verifiedSummary?: OrderSummaryCalculation;
+  storeSettings?: PublicStoreSettings;
 }
