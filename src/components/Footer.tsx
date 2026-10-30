@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  CheckCircle2,
   Download,
   Globe,
   Loader2,
@@ -9,7 +8,6 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  X,
 } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
 import { useCatalog } from '../context/CatalogContext';
@@ -17,7 +15,6 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { formatKz } from '../utils/format';
 import { trackMetaContact } from '../utils/metaPixel';
-import { formatInstallOutcomeFeedback } from '../utils/pwa';
 import { BrandLogo } from './BrandLogo';
 import { PWAInstallModal } from './PWAInstallModal';
 import { SpeedLinesDivider } from './SpeedLinesDivider';
@@ -27,20 +24,20 @@ export const Footer: React.FC = () => {
   const { storeSettings, whatsappNumber, hasWhatsApp } = useCatalog();
   const {
     isInstalled,
+    isInstallableNatively,
     isPrompting,
     wasRecentlyDismissed,
     wasPreviouslyInstalled,
     environment,
-    lastOutcome,
     triggerNativeInstall,
     clearOutcome,
   } = usePWAInstall(location.pathname);
   const [showManualInstallModal, setShowManualInstallModal] = useState(false);
-  const outcomeRef = useRef<HTMLDivElement | null>(null);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
   const greeting = buildWhatsAppContactMessage(brandName, storeSettings.whatsappMessageTemplate);
   const whatsappHref = hasWhatsApp ? buildWhatsAppUrl(whatsappNumber, greeting) : '';
+  const isProductDetail = location.pathname.startsWith('/produto/');
 
   const socialEntries = [
     { key: 'instagram', label: 'Instagram', url: storeSettings.socialLinks.instagram },
@@ -51,18 +48,13 @@ export const Footer: React.FC = () => {
     { key: 'website', label: 'Website', url: storeSettings.socialLinks.website },
   ].filter((item): item is { key: string; label: string; url: string } => Boolean(item.url));
 
-  const outcomeFeedback = lastOutcome
-    ? formatInstallOutcomeFeedback(lastOutcome, brandName)
-    : null;
-
-  useEffect(() => {
-    if (outcomeFeedback && outcomeRef.current) {
-      outcomeRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [outcomeFeedback]);
-
   const handleFooterInstall = async () => {
     if (isInstalled || isPrompting) {
+      return;
+    }
+
+    if (environment.isIOS) {
+      setShowManualInstallModal(true);
       return;
     }
 
@@ -73,8 +65,21 @@ export const Footer: React.FC = () => {
     }
   };
 
+  const handleNativeInstallFromModal = async () => {
+    const outcome = await triggerNativeInstall();
+    if (outcome === 'accepted') {
+      setShowManualInstallModal(false);
+    }
+  };
+
   return (
-    <footer className="mt-16 border-t border-white/10 bg-[#0A0A0A] pb-28 md:pb-12">
+    <footer
+      className={`mt-16 border-t border-white/10 bg-[#0A0A0A] ${
+        isProductDetail
+          ? 'pb-[calc(140px+env(safe-area-inset-bottom,0px))] md:pb-24'
+          : 'pb-[calc(88px+env(safe-area-inset-bottom,0px))] md:pb-12'
+      }`}
+    >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 pb-10 border-b border-white/10">
           {/* Identidade da marca, slogan, contactos oficiais e redes sociais reais */}
@@ -271,16 +276,7 @@ export const Footer: React.FC = () => {
                 </a>
               )}
 
-              {isInstalled ? (
-                <span
-                  role="status"
-                  aria-label="Aplicação Bercali Store já instalada"
-                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-[#22C55E]/40 bg-[#1A1A1A] px-4 py-2 font-display text-xs font-bold uppercase text-[#22C55E] whitespace-nowrap select-none"
-                >
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-[#22C55E]" aria-hidden="true" />
-                  <span>App Instalada</span>
-                </span>
-              ) : (
+              {!isInstalled && (
                 <button
                   type="button"
                   disabled={isPrompting}
@@ -301,32 +297,6 @@ export const Footer: React.FC = () => {
                 </button>
               )}
             </div>
-
-            {/* Resultado real da escolha do utilizador no pedido de instalação do navegador */}
-            {outcomeFeedback && (
-              <div
-                ref={outcomeRef}
-                role="status"
-                aria-live="polite"
-                className={`scroll-mb-24 flex items-start justify-between gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
-                  outcomeFeedback.tone === 'success'
-                    ? 'border-[#22C55E]/40 bg-[#1A1A1A] text-[#22C55E]'
-                    : outcomeFeedback.tone === 'warning'
-                    ? 'border-[#FFC400]/40 bg-[#1A1A1A] text-[#FFC400]'
-                    : 'border-white/15 bg-[#1A1A1A] text-white/85'
-                }`}
-              >
-                <span>{outcomeFeedback.message}</span>
-                <button
-                  type="button"
-                  onClick={clearOutcome}
-                  aria-label="Ocultar aviso de instalação"
-                  className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-[#8A8A8A] hover:text-white cursor-pointer"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -340,14 +310,19 @@ export const Footer: React.FC = () => {
       </div>
 
       {/* Instruções reais por dispositivo/navegador quando o evento nativo não está disponível */}
-      <PWAInstallModal
-        open={showManualInstallModal}
-        brandName={brandName}
-        environment={environment}
-        wasRecentlyDismissed={wasRecentlyDismissed}
-        wasPreviouslyInstalled={wasPreviouslyInstalled}
-        onClose={() => setShowManualInstallModal(false)}
-      />
+      {!isInstalled && (
+        <PWAInstallModal
+          open={showManualInstallModal}
+          brandName={brandName}
+          environment={environment}
+          isInstallableNatively={isInstallableNatively}
+          isPrompting={isPrompting}
+          onTriggerNativeInstall={handleNativeInstallFromModal}
+          wasRecentlyDismissed={wasRecentlyDismissed}
+          wasPreviouslyInstalled={wasPreviouslyInstalled}
+          onClose={() => setShowManualInstallModal(false)}
+        />
+      )}
     </footer>
   );
 };

@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Check, Copy, ExternalLink, Smartphone, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  Loader2,
+  Monitor,
+  Smartphone,
+  X,
+} from 'lucide-react';
 import {
   resolveInstallFallbackInstruction,
   type InstallEnvironmentInfo,
@@ -10,6 +20,9 @@ interface PWAInstallModalProps {
   open: boolean;
   brandName: string;
   environment: InstallEnvironmentInfo;
+  isInstallableNatively?: boolean;
+  isPrompting?: boolean;
+  onTriggerNativeInstall?: () => Promise<void> | void;
   wasRecentlyDismissed?: boolean;
   wasPreviouslyInstalled?: boolean;
   onClose: () => void;
@@ -51,6 +64,9 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
   open,
   brandName,
   environment,
+  isInstallableNatively = false,
+  isPrompting = false,
+  onTriggerNativeInstall,
   wasRecentlyDismissed = false,
   wasPreviouslyInstalled = false,
   onClose,
@@ -84,6 +100,11 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
     wasRecentlyDismissed,
     wasPreviouslyInstalled,
   });
+
+  const canUseDirectNativeInstall =
+    isInstallableNatively && !environment.isIOS && Boolean(onTriggerNativeInstall);
+
+  const DeviceIcon = environment.isMobile ? Smartphone : Monitor;
 
   const handleCopyLink = async () => {
     const success = await copyTextSafe(instruction.copyUrl);
@@ -130,71 +151,122 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
           </button>
         </div>
 
-        {/* Instrução principal adaptada ao navegador/dispositivo */}
-        <div className="rounded-xl bg-[#0A0A0A] border border-[#FF8A00]/40 p-3.5">
-          <p className="flex items-start gap-2.5 font-display text-sm font-bold text-white leading-relaxed">
-            <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A00]" aria-hidden="true" />
-            <span>{instruction.primaryInstruction}</span>
-          </p>
-        </div>
+        {canUseDirectNativeInstall ? (
+          <div className="space-y-3">
+            <p className="rounded-xl bg-[#0A0A0A] border border-white/10 px-3.5 py-3 text-xs text-white/90 leading-relaxed">
+              A instalação direta está disponível neste dispositivo. Toca abaixo para adicionar a{' '}
+              <strong className="text-white">{brandName}</strong> ao teu ecrã.
+            </p>
+            <button
+              type="button"
+              disabled={isPrompting}
+              onClick={() => void onTriggerNativeInstall?.()}
+              className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-[#FF8A00] px-4 py-2.5 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+            >
+              {isPrompting ? (
+                <>
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  <span>A aguardar confirmação...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 shrink-0" />
+                  <span>Instalar agora</span>
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Instrução principal adaptada ao navegador/dispositivo */}
+            <div className="rounded-xl bg-[#0A0A0A] border border-[#FF8A00]/40 p-3.5">
+              <p className="flex items-start gap-2.5 font-display text-sm font-bold text-white leading-relaxed">
+                <DeviceIcon
+                  className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A00]"
+                  aria-hidden="true"
+                />
+                <span>{instruction.primaryInstruction}</span>
+              </p>
+            </div>
 
-        {/* Ações rápidas para navegadores internos (WhatsApp, Facebook, Instagram, TikTok, Messenger) ou iOS não-Safari */}
-        {(instruction.showCopyLinkButton || instruction.showOpenInChromeButton) && (
-          <div
-            className={`grid gap-2 ${
-              instruction.showCopyLinkButton && instruction.showOpenInChromeButton
-                ? 'grid-cols-2'
-                : 'grid-cols-1'
-            }`}
-          >
-            {instruction.showCopyLinkButton && (
-              <button
-                type="button"
-                onClick={() => void handleCopyLink()}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#0A0A0A] px-3 py-2 font-display text-xs font-bold text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+            {/* Passos detalhados apenas quando a instalação nativa não está disponível */}
+            {instruction.steps.length > 0 && (
+              <ol className="rounded-xl bg-[#0A0A0A] border border-white/10 p-3.5 space-y-2.5 text-xs text-white/90 leading-relaxed">
+                {instruction.steps.map((step, index) => (
+                  <li key={`pwa-step-${index}`} className="flex items-start gap-2.5">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FF8A00]/15 border border-[#FF8A00]/40 font-display text-[11px] font-bold text-[#FFC400] tabular-nums">
+                      {index + 1}
+                    </span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {/* Ações rápidas para navegadores internos (WhatsApp, Facebook, Instagram, TikTok, Messenger) ou outros navegadores */}
+            {(instruction.showCopyLinkButton || instruction.showOpenInChromeButton) && (
+              <div
+                className={`grid gap-2 ${
+                  instruction.showCopyLinkButton && instruction.showOpenInChromeButton
+                    ? 'grid-cols-2'
+                    : 'grid-cols-1'
+                }`}
               >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 shrink-0 text-[#22C55E]" />
-                    <span className="text-[#22C55E]">Link copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 shrink-0 text-[#FF8A00]" />
-                    <span>Copiar link</span>
-                  </>
+                {instruction.showCopyLinkButton && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyLink()}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#0A0A0A] px-3 py-2 font-display text-xs font-bold text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4 shrink-0 text-[#FFC400]" />
+                        <span className="text-[#FFC400]">Link copiado</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 shrink-0 text-[#FF8A00]" />
+                        <span>Copiar link</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+
+                {instruction.showOpenInChromeButton && (
+                  <a
+                    href={instruction.openInChromeUrl}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#FF8A00] px-3 py-2 font-display text-xs font-bold text-[#0A0A0A] hover:bg-[#FFC400] transition-colors text-center"
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    <span>Abrir no Chrome</span>
+                  </a>
+                )}
+              </div>
             )}
 
-            {instruction.showOpenInChromeButton && (
-              <a
-                href={instruction.openInChromeUrl}
-                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#FF8A00] px-3 py-2 font-display text-xs font-bold text-[#0A0A0A] hover:bg-[#FFC400] transition-colors text-center"
-              >
-                <ExternalLink className="h-4 w-4 shrink-0" />
-                <span>Abrir no Chrome</span>
-              </a>
+            {/* Indicação quando já instalada ou dispensada recentemente */}
+            {instruction.statusNote && (
+              <p className="rounded-xl bg-[#0A0A0A] border border-white/10 px-3 py-2.5 text-xs text-white/85 leading-relaxed">
+                {instruction.statusNote}
+              </p>
             )}
-          </div>
-        )}
 
-        {/* Indicação quando já instalada ou dispensada recentemente (Chrome / Edge sem evento) */}
-        {instruction.statusNote && (
-          <p className="rounded-xl bg-[#0A0A0A] border border-white/10 px-3 py-2.5 text-xs text-white/85 leading-relaxed">
-            {instruction.statusNote}
-          </p>
-        )}
+            {instruction.secondaryHelper && (
+              <p className="text-xs text-[#8A8A8A] leading-relaxed">
+                {instruction.secondaryHelper}
+              </p>
+            )}
 
-        {instruction.secondaryHelper && (
-          <p className="text-xs text-[#8A8A8A] leading-relaxed">{instruction.secondaryHelper}</p>
-        )}
-
-        {instruction.contextNotice && (
-          <div className="flex items-start gap-2 rounded-xl bg-[#0A0A0A] border border-[#FFC400]/35 px-3 py-2.5 text-xs text-white/90 leading-relaxed">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#FFC400]" aria-hidden="true" />
-            <span>{instruction.contextNotice}</span>
-          </div>
+            {instruction.contextNotice && (
+              <div className="flex items-start gap-2 rounded-xl bg-[#0A0A0A] border border-[#FFC400]/35 px-3 py-2.5 text-xs text-white/90 leading-relaxed">
+                <AlertCircle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-[#FFC400]"
+                  aria-hidden="true"
+                />
+                <span>{instruction.contextNotice}</span>
+              </div>
+            )}
+          </>
         )}
 
         <div className="pt-0.5">

@@ -11,6 +11,22 @@ import './index.css';
 
 ensurePWAStoreInitialized();
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    if (window.location.pathname.startsWith('/finalizar')) return;
+    try {
+      const reloadKey = 'bercali_chunk_reload_at';
+      const lastReload = Number(window.sessionStorage.getItem(reloadKey) || '0');
+      if (Date.now() - lastReload < 15_000) return;
+      event.preventDefault();
+      window.sessionStorage.setItem(reloadKey, String(Date.now()));
+      window.location.reload();
+    } catch {
+      // Ignora em modo restrito de sessionStorage
+    }
+  });
+}
+
 if (import.meta.env.PROD && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   let userAcceptedUpdate = false;
   let lastUpdateCheckAt = 0;

@@ -4,11 +4,10 @@
  * - Limpa caches antigos ao ativar e só assume controlo quando o utilizador aceita atualizar.
  */
 
-const OFFLINE_CACHE_NAME = 'bercali-offline-v1';
-const HTML_SHELL_CACHE_NAME = 'bercali-app-shell-html-v1';
+const OFFLINE_CACHE_NAME = 'bercali-offline-v2';
 const ALLOWED_BERCALI_CACHES = new Set([
   OFFLINE_CACHE_NAME,
-  HTML_SHELL_CACHE_NAME,
+  'bercali-static-brand-assets',
   'bercali-google-fonts-stylesheets',
   'bercali-google-fonts-webfonts',
 ]);
@@ -17,12 +16,14 @@ function isBypassedRealtimeOrExternalRequest(url) {
   const host = url.hostname.toLowerCase();
   const path = url.pathname.toLowerCase();
 
-  // Nunca interferir com redirecionamentos WhatsApp
+  // Nunca interferir com redirecionamentos WhatsApp nem eventos de marketing
   if (
     host === 'wa.me' ||
     host.endsWith('.wa.me') ||
     host === 'whatsapp.com' ||
-    host.endsWith('.whatsapp.com')
+    host.endsWith('.whatsapp.com') ||
+    host === 'connect.facebook.net' ||
+    host.endsWith('.facebook.com')
   ) {
     return true;
   }
@@ -101,16 +102,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         try {
-          const networkResponse = await fetch(request);
-          if (
-            networkResponse &&
-            networkResponse.ok &&
-            (networkResponse.headers.get('content-type') || '').includes('text/html')
-          ) {
-            const shellCache = await caches.open(HTML_SHELL_CACHE_NAME);
-            shellCache.put('/index.html', networkResponse.clone()).catch(() => undefined);
-          }
-          return networkResponse;
+          return await fetch(request);
         } catch {
           const offlinePage =
             (await caches.match('/offline.html', { ignoreSearch: true })) ||

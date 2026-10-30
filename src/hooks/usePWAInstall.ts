@@ -476,7 +476,7 @@ export function usePWAInstall(currentPathname: string) {
   const applyUpdate = useCallback(() => applyServiceWorkerUpdate(), []);
 
   const isCheckoutRoute = currentPathname.startsWith('/finalizar');
-  const isInstallableNatively = Boolean(snapshot.deferredPrompt);
+  const isInstallableNatively = Boolean(snapshot.deferredPrompt) && !snapshot.environment.isIOS;
   const canOfferInvite = isInstallableNatively || snapshot.environment.isIOS;
 
   const shouldShowTimedInvite =

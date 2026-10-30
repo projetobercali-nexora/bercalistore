@@ -152,21 +152,42 @@ export default defineConfig(({mode}) => {
         registerType: 'prompt',
         manifest: false,
         workbox: {
+          clientsClaim: true,
           cleanupOutdatedCaches: true,
           importScripts: ['/sw-custom.js'],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-          // Faz precache apenas à estrutura estática da app (JS, CSS, ícones, fontes e offline.html).
+          // Precache leve e rápido (~150 KB) apenas para JS/CSS essenciais, ícone 192x192 e offline.html,
+          // evitando que imagens pesadas bloqueiem a instalação do Service Worker em redes móveis.
           // Nunca faz cache a pedidos Supabase para garantir produtos, preços, stock e definições em tempo real.
-          globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}', 'offline.html'],
+          globPatterns: ['**/*.{js,css,ico,svg,woff,woff2}', 'pwa-192x192.png', 'offline.html'],
           globIgnores: [
             '**/Manual_de_Marca_*',
             '**/Paste_*',
+            'assets/aistudio/**',
             'demo-media/**',
             'sw-custom.js',
             'manifest.webmanifest',
           ],
           navigateFallback: null,
           runtimeCaching: [
+            {
+              urlPattern: ({url, sameOrigin}) =>
+                sameOrigin &&
+                /^\/(?:pwa-.*\.png|apple-touch-icon\.png|assets\/aistudio\/.*\.png)$/i.test(
+                  url.pathname
+                ),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'bercali-static-brand-assets',
+                expiration: {
+                  maxEntries: 15,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'StaleWhileRevalidate',

@@ -1,25 +1,59 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
+import { Download, Loader2, Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
 import { useCartCount } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { trackMetaContact } from '../utils/metaPixel';
 import { BrandLogo } from './BrandLogo';
+import { PWAInstallModal } from './PWAInstallModal';
 
 export const Header: React.FC = () => {
   const totalItemsCount = useCartCount();
   const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const {
+    isInstalled,
+    isInstallableNatively,
+    isPrompting,
+    wasRecentlyDismissed,
+    wasPreviouslyInstalled,
+    environment,
+    triggerNativeInstall,
+    clearOutcome,
+  } = usePWAInstall(location.pathname);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname, location.search]);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
+
+  const handleMobileDrawerInstall = async () => {
+    if (isInstalled || isPrompting) return;
+    setMobileMenuOpen(false);
+    if (environment.isIOS) {
+      setShowInstallModal(true);
+      return;
+    }
+    const outcome = await triggerNativeInstall();
+    if (outcome === 'unavailable' || outcome === 'failed') {
+      clearOutcome();
+      setShowInstallModal(true);
+    }
+  };
+
+  const handleNativeInstallFromModal = async () => {
+    const outcome = await triggerNativeInstall();
+    if (outcome === 'accepted') {
+      setShowInstallModal(false);
+    }
+  };
   const directWhatsappHref = hasWhatsApp
     ? buildWhatsAppUrl(
         whatsappNumber,
@@ -200,7 +234,28 @@ export const Header: React.FC = () => {
               </Link>
             </nav>
 
-            <div className="mt-auto pt-5 border-t border-white/10">
+            <div className="mt-auto pt-5 border-t border-white/10 space-y-2.5">
+              {!isInstalled && (
+                <button
+                  type="button"
+                  disabled={isPrompting}
+                  onClick={() => void handleMobileDrawerInstall()}
+                  className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-[#1A1A1A] px-4 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {isPrompting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-[#FF8A00]" />
+                      <span>A aguardar...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 text-[#FF8A00]" />
+                      <span>Instalar aplicação</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               {directWhatsappHref && (
                 <a
                   href={directWhatsappHref}
@@ -209,18 +264,32 @@ export const Header: React.FC = () => {
                   onClick={() => {
                     trackMetaContact('Menu Móvel WhatsApp');
                   }}
-                  className="mb-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-bercali-gradient px-4 font-display text-sm font-bold uppercase text-[#0A0A0A]"
+                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg bg-bercali-gradient px-4 font-display text-sm font-bold uppercase text-[#0A0A0A]"
                 >
                   <MessageCircle className="h-5 w-5" />
                   Falar no WhatsApp
                 </a>
               )}
-              <p className="text-center text-xs text-[#8A8A8A]">
+              <p className="pt-0.5 text-center text-xs text-[#8A8A8A]">
                 {storeSettings.slogan || STORE_CONFIG.slogan}
               </p>
             </div>
           </aside>
         </div>
+      )}
+
+      {!isInstalled && (
+        <PWAInstallModal
+          open={showInstallModal}
+          brandName={brandName}
+          environment={environment}
+          isInstallableNatively={isInstallableNatively}
+          isPrompting={isPrompting}
+          onTriggerNativeInstall={handleNativeInstallFromModal}
+          wasRecentlyDismissed={wasRecentlyDismissed}
+          wasPreviouslyInstalled={wasPreviouslyInstalled}
+          onClose={() => setShowInstallModal(false)}
+        />
       )}
     </>
   );

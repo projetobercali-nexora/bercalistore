@@ -62,7 +62,10 @@ export type InstallFallbackCaseId =
   | 'ios-other'
   | 'samsung'
   | 'firefox-android'
-  | 'chromium-no-event';
+  | 'chromium-no-event'
+  | 'desktop-chromium'
+  | 'macos-safari'
+  | 'desktop-other';
 
 export interface InstallFallbackOptions {
   brandName?: string;
@@ -76,6 +79,7 @@ export interface InstallFallbackInstruction {
   deviceLabel: string;
   title: string;
   primaryInstruction: string;
+  steps: string[];
   statusNote?: string;
   secondaryHelper?: string;
   contextNotice?: string;
@@ -101,6 +105,15 @@ export const FIREFOX_ANDROID_INSTALL_INSTRUCTION = 'Menu (⋮) > Instalar';
 
 export const CHROME_EDGE_NO_EVENT_INSTALL_INSTRUCTION =
   'Menu (⋮) > Instalar app ou Adicionar ao ecrã inicial';
+
+export const DESKTOP_CHROMIUM_INSTALL_INSTRUCTION =
+  'Clica no ícone de instalação na barra de endereços ou abre o menu (⋮) > Instalar aplicação';
+
+export const MACOS_SAFARI_INSTALL_INSTRUCTION =
+  'Na barra do Safari, abre Ficheiro > Adicionar à Dock';
+
+export const DESKTOP_OTHER_BROWSER_INSTALL_INSTRUCTION =
+  'Para instalar no computador, abre esta loja no Google Chrome ou Microsoft Edge';
 
 export function isPWADebugQueryEnabled(search: string | null | undefined): boolean {
   if (!search) return false;
@@ -289,8 +302,18 @@ export function resolveInstallFallbackInstruction(
       deviceLabel: `Navegador interno · ${appLabel}`,
       title: `Instalar ${cleanBrand}`,
       primaryInstruction: IN_APP_INSTALL_INSTRUCTION,
+      steps: env.isIOS
+        ? [
+            'Toca em «Copiar link» abaixo.',
+            'Abre o Safari no teu iPhone ou iPad e cola o endereço.',
+            'Toca em Partilhar e escolhe «Adicionar ao ecrã principal».',
+          ]
+        : [
+            'Toca em «Abrir no Chrome» abaixo (ou copia o link).',
+            'No Google Chrome, toca em «Instalar» ou abre o menu (⋮) > Instalar aplicação.',
+          ],
       secondaryHelper: env.isIOS
-        ? 'No iPhone/iPad, podes também copiar o link e abrir no Safari (Partilhar > Adicionar ao ecrã principal).'
+        ? 'No iPhone/iPad, a instalação no ecrã principal é feita manualmente através do Safari.'
         : undefined,
       contextNotice,
       showCopyLinkButton: true,
@@ -300,7 +323,7 @@ export function resolveInstallFallbackInstruction(
     };
   }
 
-  // b) iPhone / iPad
+  // b) iPhone / iPad (nunca prometer instalação automática no iOS)
   if (env.isIOS) {
     if (env.browser === 'safari') {
       return {
@@ -308,6 +331,11 @@ export function resolveInstallFallbackInstruction(
         deviceLabel: 'iPhone / iPad · Safari',
         title: `Instalar ${cleanBrand}`,
         primaryInstruction: IOS_SAFARI_INSTALL_INSTRUCTION,
+        steps: [
+          'Toca no botão Partilhar (quadrado com seta para cima) na barra do Safari.',
+          'Desliza as opções e seleciona «Adicionar ao ecrã principal».',
+          'Confirma em «Adicionar» no canto superior direito.',
+        ],
         contextNotice,
         showCopyLinkButton: false,
         showOpenInChromeButton: false,
@@ -321,8 +349,13 @@ export function resolveInstallFallbackInstruction(
       deviceLabel: 'iPhone / iPad',
       title: `Instalar ${cleanBrand}`,
       primaryInstruction: IOS_OTHER_BROWSER_INSTALL_INSTRUCTION,
+      steps: [
+        'Toca em «Copiar link» abaixo.',
+        'Abre a aplicação Safari no teu iPhone ou iPad e cola o endereço.',
+        'No Safari, toca em Partilhar e depois em «Adicionar ao ecrã principal».',
+      ],
       secondaryHelper:
-        'Copia o link abaixo, cola no Safari e toca em Partilhar > Adicionar ao ecrã principal.',
+        'No iPhone e iPad, adiciona a loja ao ecrã principal através do Safari.',
       contextNotice,
       showCopyLinkButton: true,
       showOpenInChromeButton: false,
@@ -338,6 +371,10 @@ export function resolveInstallFallbackInstruction(
       deviceLabel: 'Samsung Internet',
       title: `Instalar ${cleanBrand}`,
       primaryInstruction: SAMSUNG_INTERNET_INSTALL_INSTRUCTION,
+      steps: [
+        'Toca no menu (≡) no canto inferior direito do Samsung Internet.',
+        'Seleciona «Adicionar página a» e toca em «Ecrã inicial».',
+      ],
       contextNotice,
       showCopyLinkButton: false,
       showOpenInChromeButton: false,
@@ -353,6 +390,10 @@ export function resolveInstallFallbackInstruction(
       deviceLabel: 'Firefox Android',
       title: `Instalar ${cleanBrand}`,
       primaryInstruction: FIREFOX_ANDROID_INSTALL_INSTRUCTION,
+      steps: [
+        'Toca no menu (⋮) do Firefox.',
+        'Escolhe «Instalar» ou «Adicionar ao ecrã inicial» e confirma.',
+      ],
       contextNotice,
       showCopyLinkButton: false,
       showOpenInChromeButton: false,
@@ -361,7 +402,79 @@ export function resolveInstallFallbackInstruction(
     };
   }
 
-  // e) Chrome / Edge (ou outro navegador) sem evento beforeinstallprompt
+  // e) Computador (Windows, macOS, Linux) — instruções específicas de desktop
+  if (!env.isMobile) {
+    if (env.os === 'macos' && env.browser === 'safari') {
+      return {
+        caseId: 'macos-safari',
+        deviceLabel: 'Mac · Safari',
+        title: `Instalar ${cleanBrand}`,
+        primaryInstruction: MACOS_SAFARI_INSTALL_INSTRUCTION,
+        steps: [
+          'Na barra superior do Safari, abre o menu «Ficheiro».',
+          'Clica em «Adicionar à Dock…» e confirma em «Adicionar».',
+        ],
+        contextNotice,
+        showCopyLinkButton: false,
+        showOpenInChromeButton: false,
+        copyUrl,
+        openInChromeUrl,
+      };
+    }
+
+    if (env.browser === 'chrome' || env.browser === 'edge' || env.browser === 'opera') {
+      const browserLabel =
+        env.browser === 'edge'
+          ? 'Computador · Microsoft Edge'
+          : env.browser === 'opera'
+          ? 'Computador · Opera'
+          : 'Computador · Google Chrome';
+
+      let desktopStatusNote: string | undefined;
+      if (options.wasPreviouslyInstalled) {
+        desktopStatusNote = `A ${cleanBrand} já parece estar instalada neste navegador. Podes abri-la a partir das tuas aplicações ou pelo ícone na barra de endereços.`;
+      } else if (options.wasRecentlyDismissed) {
+        desktopStatusNote =
+          'O pedido automático foi dispensado recentemente. Usa o ícone na barra de endereços ou o menu do navegador para instalar.';
+      }
+
+      return {
+        caseId: 'desktop-chromium',
+        deviceLabel: browserLabel,
+        title: `Instalar ${cleanBrand}`,
+        primaryInstruction: DESKTOP_CHROMIUM_INSTALL_INSTRUCTION,
+        steps: [
+          'Clica no ícone de instalação no lado direito da barra de endereços.',
+          `Em alternativa, abre o menu do navegador (⋮ ou ⋯) e escolhe «Instalar ${cleanBrand}».`,
+        ],
+        statusNote: desktopStatusNote,
+        contextNotice,
+        showCopyLinkButton: false,
+        showOpenInChromeButton: false,
+        copyUrl,
+        openInChromeUrl,
+      };
+    }
+
+    return {
+      caseId: 'desktop-other',
+      deviceLabel:
+        env.browser === 'firefox' ? 'Computador · Mozilla Firefox' : 'Computador · Navegador',
+      title: `Instalar ${cleanBrand}`,
+      primaryInstruction: DESKTOP_OTHER_BROWSER_INSTALL_INSTRUCTION,
+      steps: [
+        'Copia o link da loja no botão abaixo.',
+        'Abre o endereço no Google Chrome ou Microsoft Edge e clica no ícone de instalação na barra de endereços.',
+      ],
+      contextNotice,
+      showCopyLinkButton: true,
+      showOpenInChromeButton: false,
+      copyUrl,
+      openInChromeUrl,
+    };
+  }
+
+  // f) Android (Chrome / Edge / outro navegador) sem evento beforeinstallprompt
   let statusNote: string;
   if (options.wasPreviouslyInstalled && options.wasRecentlyDismissed) {
     statusNote =
@@ -379,22 +492,20 @@ export function resolveInstallFallbackInstruction(
 
   const deviceLabel =
     env.browser === 'edge'
-      ? env.isAndroid
-        ? 'Android · Microsoft Edge'
-        : 'Microsoft Edge'
+      ? 'Android · Microsoft Edge'
       : env.browser === 'chrome'
-      ? env.isAndroid
-        ? 'Android · Google Chrome'
-        : 'Google Chrome'
-      : env.isAndroid
-      ? 'Android · Navegador'
-      : 'Navegador';
+      ? 'Android · Google Chrome'
+      : 'Android · Navegador';
 
   return {
     caseId: 'chromium-no-event',
     deviceLabel,
     title: `Instalar ${cleanBrand}`,
     primaryInstruction: CHROME_EDGE_NO_EVENT_INSTALL_INSTRUCTION,
+    steps: [
+      'Toca no menu (⋮) no canto superior direito do navegador.',
+      'Seleciona «Instalar aplicação» ou «Adicionar ao ecrã inicial» e confirma.',
+    ],
     statusNote,
     contextNotice,
     showCopyLinkButton: false,
@@ -425,7 +536,7 @@ export function getAndroidInstallGuide(
     deviceLabel: resolved.deviceLabel,
     title: `${resolved.title} no Android`,
     description: resolved.primaryInstruction,
-    steps: [resolved.primaryInstruction],
+    steps: resolved.steps,
     secondaryTip: resolved.statusNote,
     contextNotice: resolved.contextNotice,
   };
@@ -452,7 +563,7 @@ export function getIOSInstallGuide(
     deviceLabel: resolved.deviceLabel,
     title: `${resolved.title} no iPhone / iPad`,
     description: resolved.primaryInstruction,
-    steps: [resolved.primaryInstruction],
+    steps: resolved.steps,
     secondaryTip: resolved.secondaryHelper,
     contextNotice: resolved.contextNotice,
   };
@@ -468,7 +579,7 @@ export function getManualInstallGuide(
     deviceLabel: resolved.deviceLabel,
     title: resolved.title,
     description: resolved.primaryInstruction,
-    steps: [resolved.primaryInstruction],
+    steps: resolved.steps,
     secondaryTip: resolved.statusNote ?? resolved.secondaryHelper,
     contextNotice: resolved.contextNotice,
   };

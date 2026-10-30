@@ -194,14 +194,72 @@ test('resolveInstallFallbackInstruction handles iPhone/iPad Safari vs other iOS 
     wasPreviouslyInstalled: true,
   });
   assert.ok(chromeInstalled.statusNote?.includes('já parece estar instalada'));
+  assert.ok(chromeInstalled.steps.length >= 2);
+});
+
+test('resolveInstallFallbackInstruction differentiates iPadOS desktop-mode UA from macOS Safari and Desktop Chrome/Edge/Firefox without mobile-only copy', () => {
+  // iPadOS requesting desktop site (MacIntel + touchPoints > 1) -> treated as iOS Safari
+  const ipadDesktopUA = detectInstallEnvironment({
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+    platform: 'MacIntel',
+    maxTouchPoints: 5,
+  });
+  assert.equal(ipadDesktopUA.isIOS, true);
+  assert.equal(ipadDesktopUA.isMobile, true);
+  const ipadInst = resolveInstallFallbackInstruction(ipadDesktopUA);
+  assert.equal(ipadInst.caseId, 'ios-safari');
+  assert.equal(ipadInst.primaryInstruction, IOS_SAFARI_INSTALL_INSTRUCTION);
+
+  // Real Mac Safari (MacIntel + touchPoints 0) -> macOS Add to Dock
+  const macSafari = detectInstallEnvironment({
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15',
+    platform: 'MacIntel',
+    maxTouchPoints: 0,
+  });
+  assert.equal(macSafari.isIOS, false);
+  assert.equal(macSafari.isMobile, false);
+  assert.equal(macSafari.os, 'macos');
+  assert.equal(macSafari.browser, 'safari');
+  const macSafariInst = resolveInstallFallbackInstruction(macSafari);
+  assert.equal(macSafariInst.caseId, 'macos-safari');
+  assert.ok(macSafariInst.primaryInstruction.includes('Dock'));
+
+  // Windows Chrome -> desktop-chromium (never mentions "telemóvel")
+  const winChrome = detectInstallEnvironment({
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    platform: 'Win32',
+    maxTouchPoints: 0,
+  });
+  assert.equal(winChrome.isMobile, false);
+  const winChromeInst = resolveInstallFallbackInstruction(winChrome, {
+    brandName: 'Bercali Store',
+  });
+  assert.equal(winChromeInst.caseId, 'desktop-chromium');
+  assert.ok(!winChromeInst.primaryInstruction.includes('telemóvel'));
+  assert.equal(winChromeInst.statusNote ?? '', '');
+
+  // Windows Firefox -> desktop-other with copy link button
+  const winFirefox = detectInstallEnvironment({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:129.0) Gecko/20100101 Firefox/129.0',
+    platform: 'Win32',
+    maxTouchPoints: 0,
+  });
+  const winFirefoxInst = resolveInstallFallbackInstruction(winFirefox);
+  assert.equal(winFirefoxInst.caseId, 'desktop-other');
+  assert.equal(winFirefoxInst.showCopyLinkButton, true);
 });
 
 test('getManualInstallGuide, getIOSInstallGuide, getAndroidInstallGuide, and formatInstallOutcomeFeedback stay backward-compatible', () => {
   const iosGuide = getIOSInstallGuide('Bercali Store');
   assert.ok(iosGuide.description.includes(IOS_SAFARI_INSTALL_INSTRUCTION));
+  assert.ok(iosGuide.steps.length >= 2);
 
   const androidGuide = getAndroidInstallGuide('Bercali Store');
   assert.ok(androidGuide.description.includes(CHROME_EDGE_NO_EVENT_INSTALL_INSTRUCTION));
+  assert.ok(androidGuide.steps.length >= 2);
 
   const iframeEnv = detectInstallEnvironment({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0.0.0 Safari/537.36',

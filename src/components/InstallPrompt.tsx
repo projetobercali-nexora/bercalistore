@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Download, RefreshCw, X } from 'lucide-react';
+import { Download, RefreshCw, Share, X } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
 import { useCatalog } from '../context/CatalogContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -13,6 +13,7 @@ export const InstallPrompt: React.FC = () => {
   const { storeSettings } = useCatalog();
   const {
     isInstalled,
+    isInstallableNatively,
     isPrompting,
     wasRecentlyDismissed,
     wasPreviouslyInstalled,
@@ -28,6 +29,10 @@ export const InstallPrompt: React.FC = () => {
   const [showInstructions, setShowInstructions] = useState(false);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
+  const isProductDetail = location.pathname.startsWith('/produto/');
+  const floatingBottomClass = isProductDetail
+    ? 'bottom-[calc(136px+env(safe-area-inset-bottom,0px))] md:bottom-24'
+    : 'bottom-[calc(72px+env(safe-area-inset-bottom,0px))] md:bottom-6';
 
   if (updateAvailable && !isCheckoutRoute) {
     return (
@@ -35,7 +40,7 @@ export const InstallPrompt: React.FC = () => {
         role="status"
         aria-live="polite"
         aria-label="Nova versão disponível"
-        className="fixed bottom-20 md:bottom-6 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-sm z-40 rounded-xl bg-[#1A1A1A] border border-[#FF8A00]/45 p-4 shadow-2xl"
+        className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[#1A1A1A] border border-[#FF8A00]/45 p-4 shadow-2xl`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -63,9 +68,20 @@ export const InstallPrompt: React.FC = () => {
 
   const handleInstallAction = async () => {
     if (isPrompting) return;
+    if (environment.isIOS) {
+      setShowInstructions(true);
+      return;
+    }
     const outcome = await triggerNativeInstall();
     if (outcome === 'unavailable' || outcome === 'failed') {
       setShowInstructions(true);
+    }
+  };
+
+  const handleNativeInstallFromModal = async () => {
+    const outcome = await triggerNativeInstall();
+    if (outcome === 'accepted') {
+      setShowInstructions(false);
     }
   };
 
@@ -74,7 +90,7 @@ export const InstallPrompt: React.FC = () => {
       {shouldShowTimedInvite && !showInstructions && (
         <aside
           aria-label={`Convite para instalar a aplicação ${brandName}`}
-          className="fixed bottom-20 md:bottom-6 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-sm z-40 rounded-xl bg-[#1A1A1A] border border-white/15 p-4 shadow-2xl"
+          className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[#1A1A1A] border border-white/15 p-4 shadow-2xl`}
         >
           <div className="flex items-start gap-3">
             <BrandLogo size="compact" />
@@ -84,7 +100,9 @@ export const InstallPrompt: React.FC = () => {
               </p>
               <p className="mt-1 text-xs text-[#8A8A8A] leading-relaxed">
                 {environment.isIOS
-                  ? `${IOS_SAFARI_INSTALL_INSTRUCTION}.`
+                  ? environment.browser === 'safari' && !environment.isInAppBrowser
+                    ? `${IOS_SAFARI_INSTALL_INSTRUCTION}.`
+                    : 'Vê como adicionar a loja ao ecrã principal do teu iPhone ou iPad.'
                   : 'Acede mais depressa ao catálogo sempre que precisares, como uma aplicação.'}
               </p>
               <div className="mt-3 flex items-center gap-2">
@@ -94,8 +112,17 @@ export const InstallPrompt: React.FC = () => {
                   onClick={() => void handleInstallAction()}
                   className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-[#FF8A00] px-3.5 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Instalar</span>
+                  {environment.isIOS ? (
+                    <>
+                      <Share className="h-3.5 w-3.5" />
+                      <span>Como instalar</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-3.5 w-3.5" />
+                      <span>Instalar</span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -122,6 +149,9 @@ export const InstallPrompt: React.FC = () => {
         open={showInstructions}
         brandName={brandName}
         environment={environment}
+        isInstallableNatively={isInstallableNatively}
+        isPrompting={isPrompting}
+        onTriggerNativeInstall={handleNativeInstallFromModal}
         wasRecentlyDismissed={wasRecentlyDismissed}
         wasPreviouslyInstalled={wasPreviouslyInstalled}
         onClose={() => {
