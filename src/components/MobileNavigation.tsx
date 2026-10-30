@@ -2,13 +2,13 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Home, LayoutGrid, MessageCircle, Search, ShoppingBag } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
-import { useCart } from '../context/CartContext';
+import { useCartCount } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
 import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { trackMetaContact } from '../utils/metaPixel';
 
 export const MobileNavigation: React.FC = () => {
-  const { totalItemsCount } = useCart();
+  const totalItemsCount = useCartCount();
   const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const location = useLocation();
   const navigate = useNavigate();

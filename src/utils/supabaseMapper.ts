@@ -16,6 +16,7 @@ import type {
 } from '../types/store';
 import {
   calculateOrderSummary,
+  findMatchingDeliveryZone,
   isValidEmailAddress,
   isValidWhatsAppNumber,
   normalizeWhatsAppNumber,
@@ -637,7 +638,17 @@ function parseDeliveryRulesArray(rawList: unknown): DeliveryFeeRule[] {
   for (const item of rawList) {
     if (typeof item !== 'object' || item === null) continue;
     const rec = item as Record<string, unknown>;
-    if (rec.is_active === false || rec.active === false || rec.enabled === false) {
+    if (
+      rec.is_active === false ||
+      rec.isActive === false ||
+      rec.active === false ||
+      rec.enabled === false ||
+      parseBooleanFlag(rec.is_active) === false ||
+      parseBooleanFlag(rec.isActive) === false ||
+      parseBooleanFlag(rec.active) === false ||
+      parseBooleanFlag(rec.enabled) === false ||
+      parseBooleanFlag(rec.status) === false
+    ) {
       continue;
     }
 
@@ -659,16 +670,37 @@ function parseDeliveryRulesArray(rawList: unknown): DeliveryFeeRule[] {
       toCleanString(rec.zone) ??
       toCleanString(rec.name) ??
       toCleanString(rec.zona) ??
+      toCleanString(rec.label) ??
+      toCleanString(rec.title) ??
       undefined;
     const estimatedTime =
       toCleanString(rec.estimatedTime) ??
       toCleanString(rec.estimated_time) ??
-      toCleanString(rec.eta) ??
+      toCleanString(rec.estimatedDelivery) ??
+      toCleanString(rec.estimated_delivery) ??
+      toCleanString(rec.deliveryTime) ??
       toCleanString(rec.delivery_time) ??
+      toCleanString(rec.eta) ??
+      toCleanString(rec.prazo) ??
+      toCleanString(rec.prazo_entrega) ??
+      toCleanString(rec.prazoEntrega) ??
+      toCleanString(rec.timeframe) ??
+      toCleanString(rec.leadTime) ??
+      toCleanString(rec.lead_time) ??
       undefined;
 
     const fee = toFiniteNumber(
-      rec.feeKz ?? rec.fee_kz ?? rec.fee ?? rec.price ?? rec.rate ?? rec.amount ?? rec.cost
+      rec.feeKz ??
+        rec.fee_kz ??
+        rec.deliveryFee ??
+        rec.delivery_fee ??
+        rec.fee ??
+        rec.price ??
+        rec.rate ??
+        rec.amount ??
+        rec.cost ??
+        rec.taxa ??
+        rec.valor
     );
 
     const rawRuleId =
@@ -1063,16 +1095,43 @@ export function extractPublicStoreSettings(
     }
 
     const rulesArrayCandidate =
-      obj.delivery_fee_rules ??
-      obj.delivery_rules ??
       obj.delivery_zones ??
+      obj.deliveryZones ??
+      obj.delivery_fee_rules ??
+      obj.deliveryFeeRules ??
+      obj.delivery_rules ??
+      obj.deliveryRules ??
       obj.shipping_zones ??
-      (groupKey === 'delivery' || groupKey === 'shipping' || groupKey === 'delivery_settings'
-        ? obj.zones ?? obj.rules ?? obj.rates
+      obj.shippingZones ??
+      (groupKey === 'delivery' ||
+      groupKey === 'shipping' ||
+      groupKey === 'delivery_settings' ||
+      groupKey === 'delivery_zones' ||
+      groupKey === 'shipping_zones' ||
+      groupKey === 'delivery_rules' ||
+      groupKey === 'delivery_fee_rules'
+        ? obj.zones ?? obj.rules ?? obj.rates ?? obj.items ?? obj.list
         : undefined);
-    const parsedRules = parseDeliveryRulesArray(parseMaybeJson(rulesArrayCandidate));
-    if (parsedRules.length > 0) {
-      result.deliveryFeeRules = parsedRules;
+    if (rulesArrayCandidate !== undefined) {
+      const maybeRulesArray = parseMaybeJson(rulesArrayCandidate);
+      if (Array.isArray(maybeRulesArray)) {
+        result.deliveryFeeRules = parseDeliveryRulesArray(maybeRulesArray);
+      }
+    } else if (groupKey === 'delivery_zones' || groupKey === 'shipping_zones') {
+      const mapEntries = Object.entries(obj).filter(
+        ([, v]) => typeof v === 'object' && v !== null && !Array.isArray(v)
+      );
+      if (mapEntries.length > 0) {
+        const synthesized = mapEntries.map(([k, v]) => {
+          const itemObj = v as Record<string, unknown>;
+          return {
+            id: itemObj.id ?? k,
+            zoneName: itemObj.zoneName ?? itemObj.zone_name ?? itemObj.name ?? k,
+            ...itemObj,
+          };
+        });
+        result.deliveryFeeRules = parseDeliveryRulesArray(synthesized);
+      }
     }
 
     // Textos comerciais, pagamentos, promoções e hero
@@ -1272,10 +1331,7 @@ export function extractPublicStoreSettings(
         key === 'delivery_zones' ||
         key === 'shipping_zones'
       ) {
-        const parsed = parseDeliveryRulesArray(val);
-        if (parsed.length > 0) {
-          result.deliveryFeeRules = parsed;
-        }
+        result.deliveryFeeRules = parseDeliveryRulesArray(val);
       } else if (key === 'banners' || key === 'hero_banners') {
         const firstActive = val.find(
           (b) =>
@@ -1608,6 +1664,7 @@ export function verifyAndRecalculateOrder(params: {
       defaultDeliveryFeeKz: storeSettings.defaultDeliveryFeeKz,
       neighborhood: customer.neighborhood,
       deliveryZone: customer.deliveryZone,
+      deliveryZoneId: customer.deliveryZoneId,
     }
   );
 
@@ -1766,32 +1823,26 @@ export function resolveCheckoutDeliveryZoneId(
 ): string | null {
   const directId = toCleanString(customer.deliveryZoneId);
   if (directId) {
-    return directId;
-  }
-
-  const chosenZone = toCleanString(customer.deliveryZone)?.toLowerCase();
-  if (!chosenZone || deliveryZones.length === 0) {
-    return null;
-  }
-
-  for (const rule of deliveryZones) {
-    if (!rule.id) continue;
-    const ruleIdClean = toCleanString(rule.id);
-    if (!ruleIdClean) continue;
-
-    const zoneNameLower = (rule.zoneName ?? '').trim().toLowerCase();
-    const compositeLabelLower = [rule.province, rule.municipality, rule.neighborhood]
-      .map((p) => (p ?? '').trim())
-      .filter(Boolean)
-      .join(' · ')
-      .toLowerCase();
-
-    if (chosenZone === zoneNameLower || chosenZone === compositeLabelLower) {
-      return ruleIdClean;
+    if (deliveryZones.length === 0) {
+      return directId;
+    }
+    const activeById = deliveryZones.find((z) => toCleanString(z.id) === directId);
+    if (activeById) {
+      return directId;
     }
   }
 
-  return null;
+  if (deliveryZones.length === 0) {
+    return null;
+  }
+
+  const matched = findMatchingDeliveryZone(deliveryZones, {
+    deliveryZoneId: customer.deliveryZoneId,
+    deliveryZone: customer.deliveryZone,
+    province: customer.province,
+  });
+
+  return matched?.id ? toCleanString(matched.id) : null;
 }
 
 /**

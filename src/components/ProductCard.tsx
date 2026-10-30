@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ImageOff, ShoppingBag } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { useCartActions, useProductCartQuantity } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
 import type { Product } from '../types/store';
 import { getMaxAllowedQuantity } from '../utils/cart';
@@ -15,10 +15,12 @@ import {
 
 interface ProductCardProps {
   product: Product;
+  priority?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const { addItem, getQuantityInCart } = useCart();
+export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, priority = false }) => {
+  const { addItem } = useCartActions();
+  const qtyInCart = useProductCartQuantity(product.id);
   const { isStoreActive } = useCatalog();
   const [imageError, setImageError] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
@@ -28,7 +30,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const purchasable = isProductPurchasable(product);
   const canAddNow = isStoreActive && purchasable;
   const discountPct = calculateDiscountPercent(product.price, product.oldPrice);
-  const qtyInCart = getQuantityInCart(product.id);
   const maxAllowed = getMaxAllowedQuantity(product);
   const stockLimitReached = canAddNow && qtyInCart >= maxAllowed;
 
@@ -57,7 +58,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             alt={product.name}
             width={800}
             height={600}
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
+            fetchPriority={priority ? 'high' : 'auto'}
+            decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
@@ -168,4 +171,4 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       </div>
     </article>
   );
-};
+});

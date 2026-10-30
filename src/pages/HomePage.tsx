@@ -18,8 +18,9 @@ import {
 } from 'lucide-react';
 import { ProductGrid } from '../components/ProductGrid';
 import { STORE_CONFIG } from '../config/store';
-import { useCart } from '../context/CartContext';
+import { useCartActions, useProductCartQuantity } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import type { Product } from '../types/store';
 import { getMaxAllowedQuantity } from '../utils/cart';
 import {
@@ -44,53 +45,57 @@ type CatalogTab = 'all' | 'new' | 'promos';
 
 interface HomeProductCardProps {
   product: Product;
+  isStoreActive: boolean;
+  priority?: boolean;
 }
 
-const HomeProductCard: React.FC<HomeProductCardProps> = ({ product }) => {
-  const { addItem, getQuantityInCart } = useCart();
-  const { isStoreActive } = useCatalog();
-  const [imageError, setImageError] = useState(false);
-  const [justAdded, setJustAdded] = useState(false);
+const HomeProductCard: React.FC<HomeProductCardProps> = React.memo(
+  ({ product, isStoreActive, priority = false }) => {
+    const { addItem } = useCartActions();
+    const qtyInCart = useProductCartQuantity(product.id);
+    const [imageError, setImageError] = useState(false);
+    const [justAdded, setJustAdded] = useState(false);
 
-  const status = getProductAvailability(product);
-  const statusLabel = getAvailabilityLabel(status);
-  const purchasable = isProductPurchasable(product);
-  const canAddNow = isStoreActive && purchasable;
-  const discountPct = calculateDiscountPercent(product.price, product.oldPrice);
-  const qtyInCart = getQuantityInCart(product.id);
-  const maxAllowed = getMaxAllowedQuantity(product);
-  const stockLimitReached = canAddNow && qtyInCart >= maxAllowed;
+    const status = getProductAvailability(product);
+    const statusLabel = getAvailabilityLabel(status);
+    const purchasable = isProductPurchasable(product);
+    const canAddNow = isStoreActive && purchasable;
+    const discountPct = calculateDiscountPercent(product.price, product.oldPrice);
+    const maxAllowed = getMaxAllowedQuantity(product);
+    const stockLimitReached = canAddNow && qtyInCart >= maxAllowed;
 
-  const mainImage = product.images.length > 0 && !imageError ? product.images[0] : null;
+    const mainImage = product.images.length > 0 && !imageError ? product.images[0] : null;
 
-  const handleAdd = () => {
-    if (!canAddNow || stockLimitReached) return;
-    const ok = addItem(product, 1);
-    if (ok) {
-      setJustAdded(true);
-      window.setTimeout(() => setJustAdded(false), 1400);
-    }
-  };
+    const handleAdd = () => {
+      if (!canAddNow || stockLimitReached) return;
+      const ok = addItem(product, 1);
+      if (ok) {
+        setJustAdded(true);
+        window.setTimeout(() => setJustAdded(false), 1400);
+      }
+    };
 
-  return (
-    <article className="group flex h-full flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md shadow-black/40 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
-      <Link
-        to={`/produto/${product.slug}`}
-        aria-label={`Ver detalhes de ${product.name}`}
-        className="relative flex h-44 sm:h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-[#1D1D1F] p-2"
-      >
-        {mainImage ? (
-          <img
-            src={mainImage}
-            alt={product.name}
-            width={640}
-            height={480}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={() => setImageError(true)}
-            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-          />
-        ) : (
+    return (
+      <article className="group flex h-full flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md shadow-black/40 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
+        <Link
+          to={`/produto/${product.slug}`}
+          aria-label={`Ver detalhes de ${product.name}`}
+          className="relative flex h-44 sm:h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-[#1D1D1F] p-2"
+        >
+          {mainImage ? (
+            <img
+              src={mainImage}
+              alt={product.name}
+              width={640}
+              height={480}
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setImageError(true)}
+              className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+            />
+          ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center">
             <ImageOff className="h-6 w-6 text-[#8A8A8A]" aria-hidden="true" />
             <span className="text-[11px] font-medium text-[#8A8A8A]">Sem fotografia</span>
@@ -169,13 +174,15 @@ const HomeProductCard: React.FC<HomeProductCardProps> = ({ product }) => {
       </div>
     </article>
   );
-};
+  }
+);
 
 export const HomePage: React.FC = () => {
   const {
     products,
     categories,
     storeSettings,
+    isStoreActive,
     loading,
     error,
     whatsappNumber,
@@ -183,6 +190,7 @@ export const HomePage: React.FC = () => {
     refreshCatalog,
   } = useCatalog();
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState<CatalogTab>('all');
   const [heroImgFailed, setHeroImgFailed] = useState(false);
@@ -209,7 +217,7 @@ export const HomePage: React.FC = () => {
   const promotionalProducts = useMemo(() => getPromotionalProducts(products), [products]);
   const newProducts = useMemo(() => getNewProducts(products), [products]);
 
-  const isFiltering = searchQuery.trim().length > 0 || selectedCategory !== 'all';
+  const isFiltering = debouncedSearchQuery.trim().length > 0 || selectedCategory !== 'all';
 
   const baseTabProducts = useMemo(() => {
     if (isFiltering) {
@@ -223,10 +231,10 @@ export const HomePage: React.FC = () => {
   const displayedCatalogProducts = useMemo(
     () =>
       filterProducts(baseTabProducts, {
-        query: searchQuery,
+        query: debouncedSearchQuery,
         category: selectedCategory,
       }),
-    [baseTabProducts, searchQuery, selectedCategory]
+    [baseTabProducts, debouncedSearchQuery, selectedCategory]
   );
 
   const handleResetFilters = () => {
@@ -331,6 +339,7 @@ export const HomePage: React.FC = () => {
             alt={heroConfig?.title || brandName}
             width={1200}
             height={240}
+            decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setHeroImgFailed(true)}
             className="h-20 sm:h-28 w-full object-cover"
@@ -556,7 +565,7 @@ export const HomePage: React.FC = () => {
                 key={`home-skeleton-${idx}`}
                 className="flex flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md animate-pulse"
               >
-                <div className="aspect-[4/3] w-full bg-[#101010]" />
+                <div className="h-44 sm:h-52 w-full bg-[#1D1D1F]" />
                 <div className="p-2.5 sm:p-3.5 space-y-2.5">
                   <div className="h-3.5 w-4/5 rounded bg-white/15" />
                   <div className="h-3.5 w-3/5 rounded bg-white/10" />
@@ -574,7 +583,7 @@ export const HomePage: React.FC = () => {
             loading={false}
             error={error}
             emptyTitle={
-              searchQuery.trim().length > 0
+              debouncedSearchQuery.trim().length > 0
                 ? 'Nenhum produto encontrado'
                 : selectedCategory !== 'all'
                 ? 'Sem produtos nesta categoria'
@@ -583,7 +592,7 @@ export const HomePage: React.FC = () => {
                 : 'Sem produtos disponíveis de momento'
             }
             emptyDescription={
-              searchQuery.trim().length > 0
+              debouncedSearchQuery.trim().length > 0
                 ? PUBLIC_MESSAGES.emptySearch
                 : selectedCategory !== 'all'
                 ? PUBLIC_MESSAGES.emptyCategory
@@ -597,8 +606,13 @@ export const HomePage: React.FC = () => {
           />
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
-            {displayedCatalogProducts.map((product) => (
-              <HomeProductCard key={product.id} product={product} />
+            {displayedCatalogProducts.map((product, idx) => (
+              <HomeProductCard
+                key={product.id}
+                product={product}
+                isStoreActive={isStoreActive}
+                priority={idx === 0}
+              />
             ))}
           </div>
         )}

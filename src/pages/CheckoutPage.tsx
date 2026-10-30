@@ -24,6 +24,7 @@ import type {
 import {
   calculateOrderSummary,
   clearConfirmedOrderFromSession,
+  findMatchingDeliveryZone,
   readConfirmedOrderFromSession,
   saveConfirmedOrderToSession,
   validateCheckoutForm,
@@ -52,7 +53,6 @@ const FIELD_ORDER: (keyof CustomerCheckoutData)[] = [
   'fullName',
   'phone',
   'email',
-  'deliveryZone',
   'province',
   'municipality',
   'neighborhood',
@@ -61,7 +61,13 @@ const FIELD_ORDER: (keyof CustomerCheckoutData)[] = [
 
 export const CheckoutPage: React.FC = () => {
   const { items, lines, clearCart } = useCart();
-  const { deliveryFeeRules, storeSettings, hasWhatsApp, isStoreActive } = useCatalog();
+  const {
+    deliveryFeeRules,
+    storeSettings,
+    hasWhatsApp,
+    isStoreActive,
+    loading: catalogLoading,
+  } = useCatalog();
   const [customer, setCustomer] = useState<CustomerCheckoutData>(INITIAL_CUSTOMER);
   const [touchedSubmit, setTouchedSubmit] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,6 +107,7 @@ export const CheckoutPage: React.FC = () => {
           defaultDeliveryFeeKz: storeSettings.defaultDeliveryFeeKz,
           neighborhood: customer.neighborhood,
           deliveryZone: customer.deliveryZone,
+          deliveryZoneId: customer.deliveryZoneId,
         }
       ),
     [
@@ -109,11 +116,37 @@ export const CheckoutPage: React.FC = () => {
       customer.municipality,
       customer.neighborhood,
       customer.deliveryZone,
+      customer.deliveryZoneId,
       deliveryFeeRules,
       storeSettings.freeDeliveryThresholdKz,
       storeSettings.defaultDeliveryFeeKz,
     ]
   );
+
+  // Se uma zona for desativada em tempo real no painel enquanto o checkout está aberto, limpa a seleção antiga
+  useEffect(() => {
+    if (catalogLoading) return;
+    if (!customer.province.trim() && !(customer.deliveryZone ?? '').trim()) return;
+    const stillActive = findMatchingDeliveryZone(deliveryFeeRules, {
+      deliveryZoneId: customer.deliveryZoneId,
+      deliveryZone: customer.deliveryZone,
+      province: customer.province,
+    });
+    if (!stillActive) {
+      setCustomer((prev) => ({
+        ...prev,
+        province: '',
+        deliveryZone: '',
+        deliveryZoneId: null,
+      }));
+    }
+  }, [
+    catalogLoading,
+    customer.deliveryZone,
+    customer.deliveryZoneId,
+    customer.province,
+    deliveryFeeRules,
+  ]);
 
   useEffect(() => {
     if (lines.length === 0 || confirmedOrder) return;
@@ -136,13 +169,20 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handleSelectDeliveryZone = (zoneLabel: string, matchedRule?: DeliveryFeeRule) => {
+    if (!zoneLabel) {
+      setCustomer((prev) => ({
+        ...prev,
+        deliveryZone: '',
+        deliveryZoneId: null,
+        province: '',
+      }));
+      return;
+    }
     setCustomer((prev) => ({
       ...prev,
       deliveryZone: zoneLabel,
       deliveryZoneId: matchedRule?.id ?? null,
-      province: matchedRule?.province ? matchedRule.province : prev.province,
-      municipality: matchedRule?.municipality ? matchedRule.municipality : prev.municipality,
-      neighborhood: matchedRule?.neighborhood ? matchedRule.neighborhood : prev.neighborhood,
+      province: matchedRule?.province || zoneLabel,
     }));
   };
 
@@ -322,6 +362,7 @@ export const CheckoutPage: React.FC = () => {
             onChange={handleFieldChange}
             deliveryZones={deliveryFeeRules}
             onSelectDeliveryZone={handleSelectDeliveryZone}
+            loadingZones={catalogLoading}
             disabled={!isStoreActive || isSubmitting}
           />
         </div>

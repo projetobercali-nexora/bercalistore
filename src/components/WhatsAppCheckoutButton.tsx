@@ -17,7 +17,9 @@ import type {
 import {
   buildWhatsAppOrderMessage,
   buildWhatsAppUrl,
+  findMatchingDeliveryZone,
   hasValidationErrors,
+  NO_ACTIVE_DELIVERY_ZONES_MESSAGE,
   validateCheckoutForm,
 } from '../utils/checkout';
 import { PUBLIC_MESSAGES } from '../utils/publicMessages';
@@ -53,6 +55,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
     deliveryFeeRules,
     storeSettings,
     isStoreActive,
+    loading: catalogLoading,
     refreshCatalog,
   } = useCatalog();
   const [orderNumber, setOrderNumber] = useState<string>(() => generateOrderNumber());
@@ -71,6 +74,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
       customer.fullName.trim(),
       customer.phone.trim(),
       (customer.email ?? '').trim(),
+      (customer.deliveryZoneId ?? '').trim(),
       (customer.deliveryZone ?? '').trim(),
       customer.province.trim(),
       customer.municipality.trim(),
@@ -100,6 +104,13 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
   const orderTemplate =
     storeSettings.whatsappOrderTemplate ?? storeSettings.whatsappMessageTemplate;
   const effectiveSummary = verifiedSummary ?? summary;
+  const noActiveZones = !catalogLoading && deliveryFeeRules.length === 0;
+  const matchedActiveZone = findMatchingDeliveryZone(deliveryFeeRules, {
+    deliveryZoneId: customer.deliveryZoneId,
+    deliveryZone: customer.deliveryZone,
+    province: customer.province,
+  });
+  const hasSelectedProvince = Boolean(customer.province.trim()) && Boolean(matchedActiveZone);
   const errors = validateCheckoutForm(customer, {
     mode: 'storefront',
     deliveryZones: deliveryFeeRules,
@@ -223,13 +234,33 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
     );
   }
 
+  if (noActiveZones) {
+    return (
+      <div className="space-y-3">
+        <button
+          type="button"
+          disabled
+          className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-white/10 px-5 py-3.5 font-display text-sm font-extrabold uppercase tracking-wide text-[#8A8A8A] cursor-not-allowed"
+        >
+          <Lock className="h-5 w-5 shrink-0" />
+          <span>Confirmar pedido</span>
+        </button>
+        <p role="alert" className="text-xs font-medium text-[#EF4444] leading-relaxed">
+          {NO_ACTIVE_DELIVERY_ZONES_MESSAGE}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <button
         type="button"
-        disabled={isSubmitting}
+        disabled={isSubmitting || catalogLoading || !hasSelectedProvince}
         onClick={() => void handleConfirmOrder()}
-        className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-bercali-gradient px-5 py-3.5 font-display text-sm sm:text-base font-extrabold uppercase tracking-wide text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+        className={`flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-bercali-gradient px-5 py-3.5 font-display text-sm sm:text-base font-extrabold uppercase tracking-wide text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer disabled:opacity-55 ${
+          isSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'
+        }`}
       >
         {isSubmitting ? (
           <>

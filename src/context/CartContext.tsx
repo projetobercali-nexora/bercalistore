@@ -1,4 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useCatalog } from './CatalogContext';
 import type { CartItem, Product, ValidatedCartLine } from '../types/store';
 import {
@@ -32,7 +41,23 @@ interface CartContextValue {
   getQuantityInCart: (productId: string) => number;
 }
 
+interface CartActionsValue {
+  dismissFeedback: () => void;
+  addItem: (product: Product, quantity?: number) => boolean;
+  setItemQuantity: (product: Product, nextQuantity: number) => void;
+  removeItem: (productId: string) => void;
+  clearCart: () => void;
+}
+
+interface CartExternalStore {
+  subscribe: (listener: () => void) => () => void;
+  getItemQuantity: (productId: string) => number;
+  getTotalItemsCount: () => number;
+}
+
 const CartContext = createContext<CartContextValue | undefined>(undefined);
+const CartActionsContext = createContext<CartActionsValue | undefined>(undefined);
+const CartExternalStoreContext = createContext<CartExternalStore | undefined>(undefined);
 
 /**
  * Lê o formato base do carrinho no arranque antes de o catálogo assíncrono do Supabase terminar,
@@ -90,6 +115,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [storageAvailable, setStorageAvailable] = useState<boolean>(initialState.storageAvailable);
   const [feedback, setFeedback] = useState<CartFeedback | null>(null);
   const timerRef = useRef<number | null>(null);
+
+  const listenersRef = useRef<Set<() => void>>(new Set());
+  const qtyByProductIdRef = useRef<Map<string, number>>(
+    new Map(initialState.items.map((item) => [item.productId, item.quantity]))
+  );
+  const totalCountRef = useRef<number>(
+    initialState.items.reduce((sum, item) => sum + item.quantity, 0)
+  );
 
   // Sincroniza e higieniza o carrinho com os produtos reais e stocks do Supabase assim que o catálogo carrega sem erro
   useEffect(() => {
@@ -225,6 +258,40 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [lines]
   );
 
+  // Atualiza store externa para seletores granulares (evita re-renders nos cartões de outros produtos)
+  useEffect(() => {
+    qtyByProductIdRef.current = new Map(items.map((item) => [item.productId, item.quantity]));
+    totalCountRef.current = totalItemsCount;
+    for (const listener of listenersRef.current) {
+      listener();
+    }
+  }, [items, totalItemsCount]);
+
+  const externalStore = useMemo<CartExternalStore>(
+    () => ({
+      subscribe: (listener) => {
+        listenersRef.current.add(listener);
+        return () => {
+          listenersRef.current.delete(listener);
+        };
+      },
+      getItemQuantity: (productId) => qtyByProductIdRef.current.get(productId) ?? 0,
+      getTotalItemsCount: () => totalCountRef.current,
+    }),
+    []
+  );
+
+  const actionsValue = useMemo<CartActionsValue>(
+    () => ({
+      dismissFeedback,
+      addItem,
+      setItemQuantity,
+      removeItem,
+      clearCart,
+    }),
+    [dismissFeedback, addItem, setItemQuantity, removeItem, clearCart]
+  );
+
   const value = useMemo<CartContextValue>(
     () => ({
       items,
@@ -256,7 +323,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ]
   );
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartExternalStoreContext.Provider value={externalStore}>
+      <CartActionsContext.Provider value={actionsValue}>
+        <CartContext.Provider value={value}>{children}</CartContext.Provider>
+      </CartActionsContext.Provider>
+    </CartExternalStoreContext.Provider>
+  );
 };
 
 export function useCart(): CartContextValue {
@@ -265,4 +338,33 @@ export function useCart(): CartContextValue {
     throw new Error('useCart deve ser usado dentro de CartProvider');
   }
   return ctx;
+}
+
+export function useCartActions(): CartActionsValue {
+  const ctx = useContext(CartActionsContext);
+  if (!ctx) {
+    throw new Error('useCartActions deve ser usado dentro de CartProvider');
+  }
+  return ctx;
+}
+
+export function useProductCartQuantity(productId: string): number {
+  const store = useContext(CartExternalStoreContext);
+  if (!store) {
+    throw new Error('useProductCartQuantity deve ser usado dentro de CartProvider');
+  }
+  const getQty = useCallback(() => store.getItemQuantity(productId), [store, productId]);
+  return useSyncExternalStore(store.subscribe, getQty, getQty);
+}
+
+export function useCartCount(): number {
+  const store = useContext(CartExternalStoreContext);
+  if (!store) {
+    throw new Error('useCartCount deve ser usado dentro de CartProvider');
+  }
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getTotalItemsCount,
+    store.getTotalItemsCount
+  );
 }

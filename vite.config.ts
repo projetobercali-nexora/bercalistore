@@ -149,88 +149,24 @@ export default defineConfig(({mode}) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
-        manifestFilename: 'manifest.webmanifest',
-        manifest: {
-          id: '/',
-          name: 'Bercali Store',
-          short_name: 'Bercali',
-          description: 'O futuro das compras começa aqui. Loja virtual da Bercali Store em Angola.',
-          lang: 'pt',
-          dir: 'ltr',
-          start_url: '/',
-          scope: '/',
-          display: 'standalone',
-          background_color: '#0A0A0A',
-          theme_color: '#0A0A0A',
-          orientation: 'portrait-primary',
-          categories: ['shopping', 'lifestyle'],
-          icons: [
-            {
-              src: '/pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any',
-            },
-            {
-              src: '/pwa-maskable-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
-        },
+        registerType: 'prompt',
+        manifest: false,
         workbox: {
-          skipWaiting: true,
-          clientsClaim: true,
           cleanupOutdatedCaches: true,
+          importScripts: ['/sw-custom.js'],
           maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-          // Evita precache estático de index.html para impedir que um Service Worker antigo na Vercel
-          // continue a servir um bundle anterior à configuração das variáveis de ambiente.
-          globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}'],
-          globIgnores: ['**/Manual_de_Marca_*', '**/Paste_*', 'demo-media/**'],
+          // Faz precache apenas à estrutura estática da app (JS, CSS, ícones, fontes e offline.html).
+          // Nunca faz cache a pedidos Supabase para garantir produtos, preços, stock e definições em tempo real.
+          globPatterns: ['**/*.{js,css,ico,png,svg,woff,woff2}', 'offline.html'],
+          globIgnores: [
+            '**/Manual_de_Marca_*',
+            '**/Paste_*',
+            'demo-media/**',
+            'sw-custom.js',
+            'manifest.webmanifest',
+          ],
           navigateFallback: null,
           runtimeCaching: [
-            {
-              // Navegação HTML usa sempre NetworkFirst para carregar de imediato cada novo deploy na Vercel,
-              // mantendo fallback offline para a PWA instalada quando não houver internet.
-              urlPattern: ({request}) => request.mode === 'navigate',
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'bercali-html-navigation',
-                networkTimeoutSeconds: 3,
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 7,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
-            {
-              // Imagens públicas de produtos no Supabase Storage: prioriza sempre a rede para refletir
-              // alterações imediatas do Painel Administrativo, com fallback em caso de falha momentânea.
-              urlPattern: /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/storage\/v1\/object\/public\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'bercali-supabase-product-images',
-                networkTimeoutSeconds: 4,
-                expiration: {
-                  maxEntries: 60,
-                  maxAgeSeconds: 60 * 60 * 24 * 7,
-                },
-                cacheableResponse: {
-                  statuses: [0, 200],
-                },
-              },
-            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'StaleWhileRevalidate',
@@ -259,7 +195,7 @@ export default defineConfig(({mode}) => {
           ],
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
       }),
     ],

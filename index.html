@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt">
+<html lang="pt-AO">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -16,20 +16,39 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bercali" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <script>
       (function () {
-        window.__bercaliDeferredInstallPrompt = null;
-        window.__bercaliAppInstalled = false;
+        var state = (window.__bercaliPwa = window.__bercaliPwa || {
+          deferredPrompt: null,
+          promptReceived: false,
+          promptReceivedAt: null,
+          appInstalled: false,
+        });
+        window.__bercaliDeferredInstallPrompt = state.deferredPrompt;
+        window.__bercaliAppInstalled = state.appInstalled;
+
         window.addEventListener('beforeinstallprompt', function (event) {
           event.preventDefault();
+          state.deferredPrompt = event;
+          state.promptReceived = true;
+          state.promptReceivedAt = Date.now();
           window.__bercaliDeferredInstallPrompt = event;
           window.dispatchEvent(new CustomEvent('bercali:pwa-prompt-captured'));
         });
+
         window.addEventListener('appinstalled', function () {
+          state.appInstalled = true;
+          state.deferredPrompt = null;
           window.__bercaliAppInstalled = true;
           window.__bercaliDeferredInstallPrompt = null;
+          try {
+            window.localStorage.setItem('bercali_pwa_ever_installed', '1');
+          } catch (_err) {
+            // Ignora restrições de armazenamento privado
+          }
           window.dispatchEvent(new CustomEvent('bercali:pwa-installed'));
         });
       })();

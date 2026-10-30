@@ -173,6 +173,8 @@ export function resolveOfficialWhatsAppFromCompanyProfile(
   };
 }
 
+export const NO_ACTIVE_DELIVERY_ZONES_MESSAGE = 'De momento não estamos a aceitar entregas';
+
 export function getDeliveryRuleLabel(rule: DeliveryFeeRule): string {
   if (rule.zoneName && rule.zoneName.trim()) {
     return rule.zoneName.trim();
@@ -181,6 +183,68 @@ export function getDeliveryRuleLabel(rule: DeliveryFeeRule): string {
     .map((p) => (p ?? '').trim())
     .filter(Boolean)
     .join(' · ');
+}
+
+export function getMunicipalityPlaceholder(province: string): string {
+  const norm = normalizeSearchText(province);
+  if (norm.includes('bengo') && !norm.includes('icolo')) {
+    return 'Ex.: Caxito, Dande, Dembos...';
+  }
+  if (norm.includes('luanda')) {
+    return 'Ex.: Belas, Viana, Cazenga...';
+  }
+  return 'Ex.: Belas, Viana, Caxito...';
+}
+
+export function findMatchingDeliveryZone(
+  rules: readonly DeliveryFeeRule[],
+  params: {
+    deliveryZoneId?: string | null;
+    deliveryZone?: string;
+    province?: string;
+  }
+): DeliveryFeeRule | undefined {
+  if (rules.length === 0) return undefined;
+
+  const cleanId = (params.deliveryZoneId ?? '').trim();
+  if (cleanId) {
+    const byId = rules.find((r) => (r.id ?? '').trim() === cleanId && r.feeKz >= 0);
+    if (byId) return byId;
+  }
+
+  const normZone = normalizeSearchText(params.deliveryZone ?? '');
+  if (normZone) {
+    const byZone = rules.find((r) => {
+      if (r.feeKz < 0) return false;
+      const labelNorm = normalizeSearchText(getDeliveryRuleLabel(r));
+      const zoneNameNorm = normalizeSearchText(r.zoneName ?? '');
+      const provNorm = normalizeSearchText(r.province);
+      return (
+        (labelNorm && labelNorm === normZone) ||
+        (zoneNameNorm && zoneNameNorm === normZone) ||
+        (provNorm && provNorm === normZone)
+      );
+    });
+    if (byZone) return byZone;
+  }
+
+  const normProv = normalizeSearchText(params.province ?? '');
+  if (normProv) {
+    const byProv = rules.find((r) => {
+      if (r.feeKz < 0) return false;
+      const provNorm = normalizeSearchText(r.province);
+      const labelNorm = normalizeSearchText(getDeliveryRuleLabel(r));
+      const zoneNameNorm = normalizeSearchText(r.zoneName ?? '');
+      return (
+        (provNorm && provNorm === normProv) ||
+        (labelNorm && labelNorm === normProv) ||
+        (zoneNameNorm && zoneNameNorm === normProv)
+      );
+    });
+    if (byProv) return byProv;
+  }
+
+  return undefined;
 }
 
 export function isValidEmailAddress(rawEmail: string): boolean {
@@ -222,12 +286,31 @@ export function validateCheckoutForm(
   }
 
   if (mode === 'storefront') {
+    const hasProvidedZonesList = options?.deliveryZones !== undefined;
+    if (hasProvidedZonesList && deliveryZones.length === 0) {
+      errors.province = NO_ACTIVE_DELIVERY_ZONES_MESSAGE;
+      return errors;
+    }
+
+    const selectedProvince = data.province.trim();
+    const selectedZone = (data.deliveryZone ?? '').trim();
+
+    if (!selectedProvince && !selectedZone) {
+      errors.province = 'Seleciona a província de entrega.';
+      return errors;
+    }
+
     if (deliveryZones.length > 0) {
-      const selectedZone = (data.deliveryZone ?? '').trim();
-      if (!selectedZone && !data.province.trim()) {
-        errors.deliveryZone = 'Seleciona a zona de entrega.';
+      const matched = findMatchingDeliveryZone(deliveryZones, {
+        deliveryZoneId: data.deliveryZoneId,
+        deliveryZone: selectedZone,
+        province: selectedProvince,
+      });
+      if (!matched) {
+        errors.province = 'Seleciona uma província de entrega válida.';
       }
     }
+
     return errors;
   }
 
@@ -261,6 +344,7 @@ export interface DeliveryCalculationOptions {
   defaultDeliveryFeeKz?: number | null;
   neighborhood?: string;
   deliveryZone?: string;
+  deliveryZoneId?: string | null;
 }
 
 export function resolveDeliveryFee(
@@ -274,14 +358,21 @@ export function resolveDeliveryFee(
   const normMunicipality = normalizeSearchText(municipality);
   const normNeighborhood = normalizeSearchText(options?.neighborhood ?? '');
   const normDeliveryZone = normalizeSearchText(options?.deliveryZone ?? '');
+  const cleanDeliveryZoneId = (options?.deliveryZoneId ?? '').trim();
 
-  if (!normProvince && !normDeliveryZone) {
+  if (!normProvince && !normDeliveryZone && !cleanDeliveryZoneId) {
     return {
       known: false,
       amountKz: 0,
       label: DELIVERY_PENDING_LABEL,
     };
   }
+
+  const directSelectedZone = findMatchingDeliveryZone(rules, {
+    deliveryZoneId: cleanDeliveryZoneId,
+    deliveryZone: options?.deliveryZone,
+    province,
+  });
 
   const freeThreshold = options?.freeDeliveryThresholdKz ?? null;
   if (
@@ -294,11 +385,27 @@ export function resolveDeliveryFee(
       known: true,
       amountKz: 0,
       label: 'Grátis',
+      estimatedTime: directSelectedZone?.estimatedTime,
     };
   }
 
   if (rules.length > 0) {
-    // 0. Correspondência direta pela zona selecionada
+    // 0. Correspondência direta pelo ID da zona selecionada
+    if (cleanDeliveryZoneId) {
+      const idMatch = rules.find(
+        (r) => (r.id ?? '').trim() === cleanDeliveryZoneId && r.feeKz >= 0
+      );
+      if (idMatch) {
+        return {
+          known: true,
+          amountKz: idMatch.feeKz,
+          label: idMatch.feeKz === 0 ? 'Grátis' : formatKz(idMatch.feeKz),
+          estimatedTime: idMatch.estimatedTime,
+        };
+      }
+    }
+
+    // 1. Correspondência direta pela zona selecionada
     if (normDeliveryZone) {
       const zoneMatch = rules.find((r) => {
         const labelNorm = normalizeSearchText(getDeliveryRuleLabel(r));
@@ -319,7 +426,7 @@ export function resolveDeliveryFee(
       }
     }
 
-    // 1. Correspondência específica por bairro / zona nomeada dentro da província (ou zona global)
+    // 2. Correspondência específica por bairro / zona nomeada dentro da província (ou zona global)
     if (normNeighborhood) {
       const neighborhoodMatch = rules.find((r) => {
         const rProv = normalizeSearchText(r.province);
@@ -338,7 +445,7 @@ export function resolveDeliveryFee(
       }
     }
 
-    // 2. Correspondência exata por província + município (ou zoneName igual ao município)
+    // 3. Correspondência exata por província + município (ou zoneName igual ao município)
     if (normMunicipality) {
       const municipalityMatch = rules.find((r) => {
         const rProv = normalizeSearchText(r.province);
@@ -357,15 +464,16 @@ export function resolveDeliveryFee(
       }
     }
 
-    // 3. Correspondência geral da província (sem município específico)
+    // 4. Correspondência geral da província / zona ativa (ex.: Luanda ou Bengo)
     if (normProvince) {
-      const provinceFallbackMatch = rules.find(
-        (r) =>
-          normalizeSearchText(r.province) === normProvince &&
-          !r.municipality &&
-          !r.neighborhood &&
-          r.feeKz >= 0
-      );
+      const provinceFallbackMatch =
+        rules.find(
+          (r) =>
+            normalizeSearchText(r.province) === normProvince &&
+            !r.municipality &&
+            !r.neighborhood &&
+            r.feeKz >= 0
+        ) ?? directSelectedZone;
 
       if (provinceFallbackMatch) {
         return {
@@ -562,12 +670,27 @@ export function buildWhatsAppOrderMessage(
       ? formatKz(summary.estimatedTotalKz)
       : `${formatKz(summary.productsSubtotalKz)} (entrega a confirmar)`;
 
+  const locationSegments: string[] = [];
+  const pushUniqueSegment = (seg: string) => {
+    const clean = seg.trim();
+    if (!clean) return;
+    const norm = normalizeSearchText(clean);
+    if (!locationSegments.some((existing) => normalizeSearchText(existing) === norm)) {
+      locationSegments.push(clean);
+    }
+  };
+  pushUniqueSegment(cleanNeighborhood);
+  pushUniqueSegment(cleanMunicipality);
+  pushUniqueSegment(cleanProvince);
+  pushUniqueSegment(cleanZone);
+
   const resolvedZoneSummary =
-    cleanZone ||
-    [cleanNeighborhood, cleanMunicipality, cleanProvince].filter(Boolean).join(', ') ||
-    DELIVERY_PENDING_LABEL;
+    locationSegments.length > 0 ? locationSegments.join(', ') : DELIVERY_PENDING_LABEL;
 
   const resolvedReferenceSummary = cleanAddress || 'A confirmar pelo WhatsApp';
+  const deliverySummaryText = summary.delivery.estimatedTime
+    ? `${summary.delivery.label} (${summary.delivery.estimatedTime})`
+    : summary.delivery.label;
 
   const trimmedTemplate = customTemplate?.trim() ?? '';
   let introGreeting = `Olá, ${cleanBrand}! Quero fazer uma encomenda.`;
@@ -592,6 +715,12 @@ export function buildWhatsAppOrderMessage(
       telemovel: cleanPhone,
       phone: cleanPhone,
       customer_phone: cleanPhone,
+      provincia: cleanProvince,
+      province: cleanProvince,
+      municipio: cleanMunicipality,
+      municipality: cleanMunicipality,
+      bairro: cleanNeighborhood,
+      neighborhood: cleanNeighborhood,
       zona: resolvedZoneSummary,
       zona_entrega: resolvedZoneSummary,
       delivery_zone: resolvedZoneSummary,
@@ -609,10 +738,12 @@ export function buildWhatsAppOrderMessage(
       products: productBlocks,
       lista_produtos: productBlocks,
       subtotal: formatKz(summary.productsSubtotalKz),
-      entrega: summary.delivery.label,
-      taxa_entrega: summary.delivery.label,
-      delivery_fee: summary.delivery.label,
-      shipping_fee: summary.delivery.label,
+      entrega: deliverySummaryText,
+      taxa_entrega: deliverySummaryText,
+      delivery_fee: deliverySummaryText,
+      shipping_fee: deliverySummaryText,
+      prazo: summary.delivery.estimatedTime ?? '',
+      estimated_time: summary.delivery.estimatedTime ?? '',
       total: totalLine,
       valor_total: totalLine,
       total_amount: totalLine,
@@ -633,6 +764,18 @@ export function buildWhatsAppOrderMessage(
       if (cleanPhone && !interpolated.includes(cleanPhone)) {
         missingDetails.push(`Telefone: ${cleanPhone}`);
       }
+      if (
+        cleanProvince &&
+        !normalizeSearchText(interpolated).includes(normalizeSearchText(cleanProvince))
+      ) {
+        missingDetails.push(`Província: ${cleanProvince}`);
+      }
+      if (
+        cleanMunicipality &&
+        !normalizeSearchText(interpolated).includes(normalizeSearchText(cleanMunicipality))
+      ) {
+        missingDetails.push(`Município: ${cleanMunicipality}`);
+      }
       if (!/\{\{?\s*(zona|zona_entrega|delivery_zone|zone)\s*\}?\}/i.test(trimmedTemplate)) {
         missingDetails.push(`Zona de entrega: ${resolvedZoneSummary}`);
       }
@@ -649,7 +792,7 @@ export function buildWhatsAppOrderMessage(
       if (
         !/\{\{?\s*(entrega|taxa_entrega|delivery_fee|shipping_fee)\s*\}?\}/i.test(trimmedTemplate)
       ) {
-        missingDetails.push(`Entrega: ${summary.delivery.label}`);
+        missingDetails.push(`Entrega: ${deliverySummaryText}`);
       }
       if (!/\{\{?\s*(total|valor_total|total_amount)\s*\}?\}/i.test(trimmedTemplate)) {
         missingDetails.push(`Total estimado: ${totalLine}`);
@@ -676,16 +819,16 @@ export function buildWhatsAppOrderMessage(
   if (cleanEmail) {
     customerLines.push(`E-mail: ${cleanEmail}`);
   }
-  customerLines.push(`Zona de entrega: ${resolvedZoneSummary}`);
-  if (cleanProvince && cleanProvince !== resolvedZoneSummary) {
+  if (cleanProvince) {
     customerLines.push(`Província: ${cleanProvince}`);
   }
-  if (cleanMunicipality && cleanMunicipality !== resolvedZoneSummary) {
+  if (cleanMunicipality) {
     customerLines.push(`Município: ${cleanMunicipality}`);
   }
-  if (cleanNeighborhood && cleanNeighborhood !== resolvedZoneSummary) {
+  if (cleanNeighborhood) {
     customerLines.push(`Bairro: ${cleanNeighborhood}`);
   }
+  customerLines.push(`Zona de entrega: ${resolvedZoneSummary}`);
   customerLines.push(`Endereço/referência: ${resolvedReferenceSummary}`);
 
   return [
@@ -699,7 +842,7 @@ export function buildWhatsAppOrderMessage(
     '',
     'RESUMO',
     `Subtotal dos produtos: ${formatKz(summary.productsSubtotalKz)}`,
-    `Entrega: ${summary.delivery.label}`,
+    `Entrega: ${deliverySummaryText}`,
     `Total estimado: ${totalLine}`,
     '',
     `Observações: ${cleanNotes}`,

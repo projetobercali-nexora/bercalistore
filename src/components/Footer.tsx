@@ -27,8 +27,9 @@ export const Footer: React.FC = () => {
   const { storeSettings, whatsappNumber, hasWhatsApp } = useCatalog();
   const {
     isInstalled,
-    isInstallableNatively,
     isPrompting,
+    wasRecentlyDismissed,
+    wasPreviouslyInstalled,
     environment,
     lastOutcome,
     triggerNativeInstall,
@@ -65,16 +66,11 @@ export const Footer: React.FC = () => {
       return;
     }
 
-    if (isInstallableNatively) {
-      const outcome = await triggerNativeInstall();
-      if (outcome === 'unavailable' || outcome === 'failed') {
-        setShowManualInstallModal(true);
-      }
-      return;
+    const outcome = await triggerNativeInstall();
+    if (outcome === 'unavailable' || outcome === 'failed') {
+      clearOutcome();
+      setShowManualInstallModal(true);
     }
-
-    clearOutcome();
-    setShowManualInstallModal(true);
   };
 
   return (
@@ -348,6 +344,8 @@ export const Footer: React.FC = () => {
         open={showManualInstallModal}
         brandName={brandName}
         environment={environment}
+        wasRecentlyDismissed={wasRecentlyDismissed}
+        wasPreviouslyInstalled={wasPreviouslyInstalled}
         onClose={() => setShowManualInstallModal(false)}
       />
     </footer>

@@ -12,6 +12,9 @@ interface LegalPageProps {
 export const LegalPage: React.FC<LegalPageProps> = ({ mode }) => {
   const { storeSettings } = useCatalog();
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
+  const deliveryTermsText = /luanda\s+e\s+bengo/i.test(storeSettings.deliveryInfo)
+    ? storeSettings.deliveryInfo
+    : `Entregamos em Luanda e Bengo. ${storeSettings.deliveryInfo}`;
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
@@ -96,7 +99,7 @@ export const LegalPage: React.FC<LegalPageProps> = ({ mode }) => {
           <p>
             Os preços apresentados encontram-se expressos em Kwanzas angolanos (Kz) e são validados
             no momento do registo da encomenda de acordo com o catálogo oficial em vigor.{' '}
-            {storeSettings.deliveryInfo}
+            {deliveryTermsText}
           </p>
           <h2 className="font-display text-base font-bold text-white pt-2">
             3. Modalidades de pagamento

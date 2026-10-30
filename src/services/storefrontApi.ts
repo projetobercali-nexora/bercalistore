@@ -6,6 +6,7 @@ import type {
   OrderSubmissionResult,
   OrderSummaryCalculation,
   Product,
+  ProductVideo,
   PublicMarketingSettings,
   PublicStoreSettings,
   StoreCategory,
@@ -55,11 +56,16 @@ export interface StorefrontCatalogResponse {
   accessNotice: string | null;
 }
 
+const PRODUCTS_GRID_COLUMNS =
+  'id, name, slug, sku, description, category_id, price, sale_price, stock_quantity, low_stock_threshold, manage_stock, status, is_available, created_at';
+
 const PRODUCTS_COLUMNS =
   'id, name, slug, sku, description, category_id, price, sale_price, stock_quantity, low_stock_threshold, manage_stock, status, is_available, visual_preset, created_at, updated_at';
 
-const CATEGORIES_COLUMNS =
-  'id, name, slug, description, is_active, created_at, updated_at';
+const CATEGORIES_GRID_COLUMNS = 'id, name, slug, description, is_active';
+
+const PRODUCT_MEDIA_GRID_COLUMNS =
+  'id, product_id, media_url, storage_path, media_type, sort_order';
 
 const PRODUCT_MEDIA_COLUMNS =
   'id, product_id, media_url, storage_path, media_type, alt_text, sort_order, created_at';
@@ -69,7 +75,7 @@ const inFlightOrderSubmissions = new Map<string, Promise<OrderSubmissionResult>>
 const completedOrderSubmissions = new Map<string, OrderSubmissionResult>();
 const activeOrderIdempotencyKeys = new Map<string, string>();
 
-async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
+async function recoverStorageMediaForProduct(sku: string, maxFiles = 1): Promise<string[]> {
   if (!supabase || !SUPABASE_PUBLIC_URL || !sku.trim()) {
     return [];
   }
@@ -81,7 +87,7 @@ async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
   for (const folder of candidateFolders) {
     const listRes = await supabase.storage
       .from(PRODUCT_MEDIA_BUCKET)
-      .list(folder, { limit: 10, sortBy: { column: 'name', order: 'asc' } });
+      .list(folder, { limit: maxFiles, sortBy: { column: 'name', order: 'asc' } });
 
     if (listRes.error || !listRes.data || listRes.data.length === 0) {
       continue;
@@ -104,6 +110,9 @@ async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
         );
         if (resolved) {
           urls.push(resolved);
+          if (urls.length >= maxFiles) {
+            break;
+          }
         }
       }
     }
@@ -114,6 +123,68 @@ async function recoverStorageMediaForProduct(sku: string): Promise<string[]> {
   }
 
   return [];
+}
+
+export interface ProductMediaGalleryResult {
+  images: string[];
+  video?: ProductVideo;
+}
+
+export async function fetchProductMediaGallery(
+  productId: string,
+  sku?: string
+): Promise<ProductMediaGalleryResult | null> {
+  const cleanId = productId.trim();
+  if (!cleanId || !supabase || !SUPABASE_CONFIG_STATUS.configured) {
+    return null;
+  }
+
+  try {
+    let mediaRes = await supabase
+      .from('product_media')
+      .select(PRODUCT_MEDIA_COLUMNS)
+      .eq('product_id', cleanId)
+      .order('sort_order', { ascending: true });
+
+    if (mediaRes.error && isMissingColumnOrSchemaCacheError(mediaRes.error)) {
+      const fallbackMedia = await supabase
+        .from('product_media')
+        .select('*')
+        .eq('product_id', cleanId);
+      mediaRes = fallbackMedia as typeof mediaRes;
+    }
+
+    if (mediaRes.error) {
+      return null;
+    }
+
+    const rawMedia = Array.isArray(mediaRes.data)
+      ? (mediaRes.data as unknown as SupabaseProductMediaRow[])
+      : [];
+
+    const mapped = mapSupabaseProductToStoreProduct(
+      {
+        id: cleanId,
+        name: 'Galeria',
+        price: 0,
+        status: 'active',
+        is_available: true,
+        product_media: rawMedia,
+      },
+      SUPABASE_PUBLIC_URL
+    );
+
+    let images = mapped?.images ?? [];
+    const video = mapped?.video;
+
+    if (images.length === 0 && sku?.trim()) {
+      images = await recoverStorageMediaForProduct(sku, 10);
+    }
+
+    return { images, video };
+  } catch {
+    return null;
+  }
 }
 
 function toPostgrestLikeError(
@@ -188,15 +259,15 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
     let [categoriesRes, productsRes, mediaRes, settingsRes, marketingRes] = await Promise.all([
       supabase
         .from('categories')
-        .select(CATEGORIES_COLUMNS)
+        .select(CATEGORIES_GRID_COLUMNS)
         .order('name', { ascending: true }),
       supabase
         .from('products')
-        .select(PRODUCTS_COLUMNS)
+        .select(PRODUCTS_GRID_COLUMNS)
         .order('created_at', { ascending: false }),
       supabase
         .from('product_media')
-        .select(PRODUCT_MEDIA_COLUMNS)
+        .select(PRODUCT_MEDIA_GRID_COLUMNS)
         .order('sort_order', { ascending: true }),
       safeSettingsQuery,
       safeMarketingQuery,
@@ -363,7 +434,25 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         ? (mediaRes.data as unknown as SupabaseProductMediaRow[])
         : [];
 
-    const hydratedRows = attachRelationsToProducts(rawProducts, rawCategories, rawMedia);
+    // Para a grelha inicial, hidrata apenas a imagem principal de capa de cada produto;
+    // a galeria completa e eventual vídeo carregam sob pedido ao abrir a página do produto.
+    const seenCoverProductIds = new Set<string>();
+    const gridCoverMedia: SupabaseProductMediaRow[] = [];
+    for (const media of rawMedia) {
+      if (!media.product_id || seenCoverProductIds.has(media.product_id)) continue;
+      const mType = (media.media_type ?? '').trim().toLowerCase();
+      if (mType.startsWith('video')) continue;
+      const resolvedUrl = resolveProductMediaUrl(media, SUPABASE_PUBLIC_URL);
+      if (!resolvedUrl) continue;
+      const cleanPath = resolvedUrl.split('?')[0].toLowerCase();
+      if (cleanPath.endsWith('.mp4') || cleanPath.endsWith('.webm') || cleanPath.endsWith('.mov')) {
+        continue;
+      }
+      seenCoverProductIds.add(media.product_id);
+      gridCoverMedia.push(media);
+    }
+
+    const hydratedRows = attachRelationsToProducts(rawProducts, rawCategories, gridCoverMedia);
 
     const mappedProducts: Product[] = [];
     let malformedRowsCount = 0;
@@ -414,7 +503,7 @@ export async function fetchStorefrontCatalog(): Promise<StorefrontCatalogRespons
         if (product.images.length > 0 || !product.sku) {
           return product;
         }
-        const recoveredImages = await recoverStorageMediaForProduct(product.sku);
+        const recoveredImages = await recoverStorageMediaForProduct(product.sku, 1);
         if (recoveredImages.length === 0) {
           return product;
         }
@@ -514,6 +603,7 @@ function buildSubmissionIdempotencyKey(
     orderNumber.trim(),
     customer.fullName.trim().toLowerCase(),
     customer.phone.replace(/\D/g, ''),
+    (customer.deliveryZoneId ?? '').trim(),
     (customer.deliveryZone ?? '').trim().toLowerCase(),
     customer.province.trim().toLowerCase(),
     customer.municipality.trim().toLowerCase(),
@@ -738,7 +828,9 @@ export async function submitOrderToSupabase(
           status: 'error',
           orderNumber,
           errorMessage:
-            zoneErrors.deliveryZone ?? 'Seleciona a zona de entrega antes de confirmar.',
+            zoneErrors.province ??
+            zoneErrors.deliveryZone ??
+            'Seleciona a província de entrega antes de confirmar.',
         };
       }
 

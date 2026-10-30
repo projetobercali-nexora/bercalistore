@@ -1,14 +1,24 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   detectInstallEnvironment,
+  isPWAInviteDismissed,
   isStandaloneDisplayMode,
+  serializePWADismissTimestamp,
   type BeforeInstallPromptEvent,
   type InstallEnvironmentInfo,
   type InstallPromptOutcome,
 } from '../utils/pwa';
 
+export interface BercaliEarlyPWAWindowState {
+  deferredPrompt: BeforeInstallPromptEvent | null;
+  promptReceived: boolean;
+  promptReceivedAt: number | null;
+  appInstalled: boolean;
+}
+
 declare global {
   interface Window {
+    __bercaliPwa?: BercaliEarlyPWAWindowState;
     __bercaliDeferredInstallPrompt?: BeforeInstallPromptEvent | null;
     __bercaliAppInstalled?: boolean;
   }
@@ -27,23 +37,95 @@ interface NavigatorWithInstalledApps extends Navigator {
 
 interface PWASharedState {
   deferredPrompt: BeforeInstallPromptEvent | null;
+  promptEverReceived: boolean;
+  promptReceivedAt: number | null;
   isInstalled: boolean;
   isPrompting: boolean;
   isDismissed: boolean;
+  wasPreviouslyInstalled: boolean;
   lastOutcome: InstallPromptOutcome | null;
   serviceWorkerReady: boolean;
+  updateAvailable: boolean;
   environment: InstallEnvironmentInfo;
 }
 
-const DISMISS_STORAGE_KEY = 'bercali_pwa_install_dismissed_v1';
-const INSTALL_PROMPT_DELAY_MS = 90_000;
+const DISMISS_STORAGE_KEY = 'bercali_pwa_install_dismissed_at_v2';
+const EVER_INSTALLED_STORAGE_KEY = 'bercali_pwa_ever_installed';
+const INSTALL_PROMPT_DELAY_MS = 4_000;
+const NATIVE_PROMPT_OPEN_TIMEOUT_MS = 5_000;
 
 function readDismissedFlag(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(DISMISS_STORAGE_KEY) === '1';
+    return isPWAInviteDismissed(window.localStorage.getItem(DISMISS_STORAGE_KEY));
   } catch {
     return false;
+  }
+}
+
+function readPreviouslyInstalledFlag(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(EVER_INSTALLED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function persistPreviouslyInstalledFlag() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(EVER_INSTALLED_STORAGE_KEY, '1');
+  } catch {
+    // Ignora restrições de armazenamento
+  }
+}
+
+function readEarlyGlobalPrompt(): {
+  deferredPrompt: BeforeInstallPromptEvent | null;
+  promptReceived: boolean;
+  promptReceivedAt: number | null;
+  appInstalled: boolean;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      deferredPrompt: null,
+      promptReceived: false,
+      promptReceivedAt: null,
+      appInstalled: false,
+    };
+  }
+  const early = window.__bercaliPwa;
+  const deferredPrompt =
+    early?.deferredPrompt ?? window.__bercaliDeferredInstallPrompt ?? null;
+  const promptReceived = Boolean(early?.promptReceived || deferredPrompt);
+  const promptReceivedAt = early?.promptReceivedAt ?? (deferredPrompt ? Date.now() : null);
+  const appInstalled = Boolean(early?.appInstalled || window.__bercaliAppInstalled);
+  return {
+    deferredPrompt,
+    promptReceived,
+    promptReceivedAt,
+    appInstalled,
+  };
+}
+
+function syncWindowGlobalPrompt(deferredPrompt: BeforeInstallPromptEvent | null, appInstalled?: boolean) {
+  if (typeof window === 'undefined') return;
+  window.__bercaliDeferredInstallPrompt = deferredPrompt;
+  if (typeof appInstalled === 'boolean') {
+    window.__bercaliAppInstalled = appInstalled;
+  }
+  if (window.__bercaliPwa) {
+    window.__bercaliPwa.deferredPrompt = deferredPrompt;
+    if (deferredPrompt) {
+      window.__bercaliPwa.promptReceived = true;
+      if (!window.__bercaliPwa.promptReceivedAt) {
+        window.__bercaliPwa.promptReceivedAt = Date.now();
+      }
+    }
+    if (typeof appInstalled === 'boolean') {
+      window.__bercaliPwa.appInstalled = appInstalled;
+    }
   }
 }
 
@@ -80,7 +162,8 @@ function computeEnvironment(): InstallEnvironmentInfo {
 
 function computeCurrentStandalone(): boolean {
   if (typeof window === 'undefined') return false;
-  if (window.__bercaliAppInstalled === true) return true;
+  const early = readEarlyGlobalPrompt();
+  if (early.appInstalled) return true;
 
   const nav = window.navigator as NavigatorWithInstalledApps;
   const match = (q: string) =>
@@ -89,7 +172,6 @@ function computeCurrentStandalone(): boolean {
   return isStandaloneDisplayMode({
     standaloneMediaMatches: match('(display-mode: standalone)'),
     fullscreenMediaMatches: match('(display-mode: fullscreen)'),
-    minimalUiMediaMatches: match('(display-mode: minimal-ui)'),
     navigatorStandalone: nav.standalone === true,
     referrer: typeof document !== 'undefined' ? document.referrer : '',
   });
@@ -97,15 +179,21 @@ function computeCurrentStandalone(): boolean {
 
 const subscribers = new Set<() => void>();
 let initialized = false;
+let pendingUpdateHandler: (() => Promise<void> | void) | null = null;
+
+const initialEarly = readEarlyGlobalPrompt();
 
 let sharedState: PWASharedState = {
-  deferredPrompt:
-    typeof window !== 'undefined' ? (window.__bercaliDeferredInstallPrompt ?? null) : null,
+  deferredPrompt: initialEarly.deferredPrompt,
+  promptEverReceived: initialEarly.promptReceived,
+  promptReceivedAt: initialEarly.promptReceivedAt,
   isInstalled: computeCurrentStandalone(),
   isPrompting: false,
   isDismissed: readDismissedFlag(),
+  wasPreviouslyInstalled: readPreviouslyInstalledFlag(),
   lastOutcome: null,
   serviceWorkerReady: false,
+  updateAvailable: false,
   environment: computeEnvironment(),
 };
 
@@ -120,42 +208,58 @@ function updateSharedState(patch: Partial<PWASharedState>) {
   emitChange();
 }
 
-function ensureStoreInitialized() {
+export function ensurePWAStoreInitialized() {
   if (initialized || typeof window === 'undefined') return;
   initialized = true;
 
   // Sincronizar eventos capturados precocemente em index.html antes de o React montar
-  const earlyPrompt = window.__bercaliDeferredInstallPrompt ?? null;
+  const early = readEarlyGlobalPrompt();
   const standaloneNow = computeCurrentStandalone();
+  if (standaloneNow) {
+    persistPreviouslyInstalledFlag();
+  }
+
   sharedState = {
     ...sharedState,
-    deferredPrompt: standaloneNow ? null : earlyPrompt,
+    deferredPrompt: standaloneNow ? null : early.deferredPrompt,
+    promptEverReceived: early.promptReceived,
+    promptReceivedAt: early.promptReceivedAt,
     isInstalled: standaloneNow,
+    isDismissed: readDismissedFlag(),
+    wasPreviouslyInstalled: standaloneNow || readPreviouslyInstalledFlag(),
     environment: computeEnvironment(),
   };
 
   const handleBeforeInstallPrompt = (event: Event) => {
     event.preventDefault();
     const promptEvent = event as BeforeInstallPromptEvent;
-    window.__bercaliDeferredInstallPrompt = promptEvent;
+    const now = Date.now();
+    syncWindowGlobalPrompt(promptEvent);
     updateSharedState({
       deferredPrompt: promptEvent,
+      promptEverReceived: true,
+      promptReceivedAt: sharedState.promptReceivedAt ?? now,
       isInstalled: computeCurrentStandalone() ? true : sharedState.isInstalled,
     });
   };
 
   const handleEarlyPromptCaptured = () => {
-    const captured = window.__bercaliDeferredInstallPrompt ?? null;
-    if (captured && captured !== sharedState.deferredPrompt) {
-      updateSharedState({ deferredPrompt: captured });
+    const captured = readEarlyGlobalPrompt();
+    if (captured.deferredPrompt && captured.deferredPrompt !== sharedState.deferredPrompt) {
+      updateSharedState({
+        deferredPrompt: captured.deferredPrompt,
+        promptEverReceived: true,
+        promptReceivedAt: captured.promptReceivedAt ?? Date.now(),
+      });
     }
   };
 
   const handleInstalled = () => {
-    window.__bercaliAppInstalled = true;
-    window.__bercaliDeferredInstallPrompt = null;
+    syncWindowGlobalPrompt(null, true);
+    persistPreviouslyInstalledFlag();
     updateSharedState({
       isInstalled: true,
+      wasPreviouslyInstalled: true,
       deferredPrompt: null,
       isPrompting: false,
       lastOutcome: 'accepted',
@@ -171,7 +275,12 @@ function ensureStoreInitialized() {
     const standaloneMql = window.matchMedia('(display-mode: standalone)');
     const handleDisplayModeChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
-        updateSharedState({ isInstalled: true, deferredPrompt: null });
+        persistPreviouslyInstalledFlag();
+        updateSharedState({
+          isInstalled: true,
+          wasPreviouslyInstalled: true,
+          deferredPrompt: null,
+        });
       } else {
         updateSharedState({ isInstalled: computeCurrentStandalone() });
       }
@@ -195,14 +304,15 @@ function ensureStoreInitialized() {
       });
   }
 
-  // Em contextos de topo (fora de iframe), verificar aplicações relacionadas instaladas quando suportado
+  // Verificar se já existe aplicação relacionada instalada sem ocultar o botão quando fora de standalone
   const nav = window.navigator as NavigatorWithInstalledApps;
   if (!sharedState.environment.isInIframe && typeof nav.getInstalledRelatedApps === 'function') {
     nav
       .getInstalledRelatedApps()
       .then((apps) => {
         if (Array.isArray(apps) && apps.length > 0) {
-          updateSharedState({ isInstalled: true, deferredPrompt: null });
+          persistPreviouslyInstalledFlag();
+          updateSharedState({ wasPreviouslyInstalled: true });
         }
       })
       .catch(() => {
@@ -212,14 +322,34 @@ function ensureStoreInitialized() {
 }
 
 export function notifyServiceWorkerStatus(ready: boolean) {
-  ensureStoreInitialized();
+  ensurePWAStoreInitialized();
   if (sharedState.serviceWorkerReady !== ready) {
     updateSharedState({ serviceWorkerReady: ready });
   }
 }
 
+export function notifyServiceWorkerUpdateAvailable(applyFn: () => Promise<void> | void) {
+  ensurePWAStoreInitialized();
+  pendingUpdateHandler = applyFn;
+  if (!sharedState.updateAvailable) {
+    updateSharedState({ updateAvailable: true });
+  }
+}
+
+export async function applyServiceWorkerUpdate(): Promise<void> {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/finalizar')) {
+    return;
+  }
+  const handler = pendingUpdateHandler;
+  pendingUpdateHandler = null;
+  updateSharedState({ updateAvailable: false });
+  if (handler) {
+    await handler();
+  }
+}
+
 function subscribe(listener: () => void) {
-  ensureStoreInitialized();
+  ensurePWAStoreInitialized();
   subscribers.add(listener);
   return () => {
     subscribers.delete(listener);
@@ -227,13 +357,13 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot(): PWASharedState {
-  ensureStoreInitialized();
+  ensurePWAStoreInitialized();
   return sharedState;
 }
 
 export function dismissPWAInvite() {
   try {
-    window.localStorage.setItem(DISMISS_STORAGE_KEY, '1');
+    window.localStorage.setItem(DISMISS_STORAGE_KEY, serializePWADismissTimestamp());
   } catch {
     // Mantém em memória na sessão atual
   }
@@ -247,15 +377,14 @@ export function clearPWAInstallOutcome() {
 }
 
 export async function triggerNativePWAInstall(): Promise<InstallPromptOutcome> {
-  ensureStoreInitialized();
+  ensurePWAStoreInitialized();
 
   if (sharedState.isPrompting) {
     return 'unavailable';
   }
 
-  const promptEvent =
-    sharedState.deferredPrompt ??
-    (typeof window !== 'undefined' ? (window.__bercaliDeferredInstallPrompt ?? null) : null);
+  const early = readEarlyGlobalPrompt();
+  const promptEvent = sharedState.deferredPrompt ?? early.deferredPrompt;
 
   if (!promptEvent || typeof promptEvent.prompt !== 'function') {
     return 'unavailable';
@@ -264,23 +393,29 @@ export async function triggerNativePWAInstall(): Promise<InstallPromptOutcome> {
   updateSharedState({ isPrompting: true, lastOutcome: null });
 
   try {
-    await promptEvent.prompt();
+    await Promise.race([
+      promptEvent.prompt(),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(
+          () => reject(new Error('prompt_open_timeout')),
+          NATIVE_PROMPT_OPEN_TIMEOUT_MS
+        );
+      }),
+    ]);
+
     const choiceResult = await promptEvent.userChoice;
     const outcome = choiceResult?.outcome === 'accepted' ? 'accepted' : 'dismissed';
 
     // O evento beforeinstallprompt só pode ser utilizado uma única vez por instância
-    if (typeof window !== 'undefined') {
-      window.__bercaliDeferredInstallPrompt = null;
-    }
+    syncWindowGlobalPrompt(null, outcome === 'accepted' ? true : undefined);
 
     if (outcome === 'accepted') {
-      if (typeof window !== 'undefined') {
-        window.__bercaliAppInstalled = true;
-      }
+      persistPreviouslyInstalledFlag();
       updateSharedState({
         deferredPrompt: null,
         isPrompting: false,
         isInstalled: true,
+        wasPreviouslyInstalled: true,
         lastOutcome: 'accepted',
       });
       return 'accepted';
@@ -290,13 +425,12 @@ export async function triggerNativePWAInstall(): Promise<InstallPromptOutcome> {
     updateSharedState({
       deferredPrompt: null,
       isPrompting: false,
+      isDismissed: true,
       lastOutcome: 'dismissed',
     });
     return 'dismissed';
   } catch {
-    if (typeof window !== 'undefined') {
-      window.__bercaliDeferredInstallPrompt = null;
-    }
+    syncWindowGlobalPrompt(null);
     updateSharedState({
       deferredPrompt: null,
       isPrompting: false,
@@ -339,6 +473,7 @@ export function usePWAInstall(currentPathname: string) {
   const triggerNativeInstall = useCallback(() => triggerNativePWAInstall(), []);
   const dismissPrompt = useCallback(() => dismissPWAInvite(), []);
   const clearOutcome = useCallback(() => clearPWAInstallOutcome(), []);
+  const applyUpdate = useCallback(() => applyServiceWorkerUpdate(), []);
 
   const isCheckoutRoute = currentPathname.startsWith('/finalizar');
   const isInstallableNatively = Boolean(snapshot.deferredPrompt);
@@ -355,15 +490,22 @@ export function usePWAInstall(currentPathname: string) {
   return {
     isInstalled: snapshot.isInstalled,
     isInstallableNatively,
+    promptEverReceived: snapshot.promptEverReceived,
+    promptReceivedAt: snapshot.promptReceivedAt,
+    wasRecentlyDismissed: snapshot.isDismissed,
+    wasPreviouslyInstalled: snapshot.wasPreviouslyInstalled,
     isPrompting: snapshot.isPrompting,
     isIOS: snapshot.environment.isIOS,
     isAndroid: snapshot.environment.isAndroid,
     environment: snapshot.environment,
     serviceWorkerReady: snapshot.serviceWorkerReady,
+    updateAvailable: snapshot.updateAvailable,
+    isCheckoutRoute,
     lastOutcome: snapshot.lastOutcome,
     shouldShowTimedInvite,
     triggerNativeInstall,
     dismissPrompt,
     clearOutcome,
+    applyUpdate,
   };
 }

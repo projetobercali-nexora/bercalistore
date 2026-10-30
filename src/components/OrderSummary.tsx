@@ -57,9 +57,17 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
           <dt className="text-[#8A8A8A]">Taxa de entrega</dt>
           <dd className="font-medium text-white tabular-nums text-right">
             {summary.delivery.label}
-            {summary.delivery.estimatedTime ? ` · ${summary.delivery.estimatedTime}` : ''}
           </dd>
         </div>
+
+        {summary.delivery.estimatedTime && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-[#8A8A8A]">Prazo de entrega</dt>
+            <dd className="font-medium text-white text-right">
+              {summary.delivery.estimatedTime}
+            </dd>
+          </div>
+        )}
 
         {freeThreshold !== null &&
           freeThreshold > 0 &&
@@ -109,14 +117,13 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
               customer.neighborhood.trim()) && (
               <p>
                 <span className="text-[#8A8A8A]">Zona:</span>{' '}
-                {(customer.deliveryZone ?? '').trim() ||
-                  [
-                    customer.neighborhood.trim(),
-                    customer.municipality.trim(),
-                    customer.province.trim(),
-                  ]
-                    .filter(Boolean)
-                    .join(', ')}
+                {[
+                  customer.neighborhood.trim(),
+                  customer.municipality.trim(),
+                  customer.province.trim() || (customer.deliveryZone ?? '').trim(),
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
               </p>
             )}
             {customer.addressReference.trim() && (

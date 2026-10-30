@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Sem ligação — Bercali Store</title>
+    <title>Sem ligação à internet — Bercali Store</title>
     <meta name="theme-color" content="#0A0A0A" />
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -15,7 +15,11 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 24px;
+        padding:
+          max(24px, env(safe-area-inset-top, 0px))
+          max(24px, env(safe-area-inset-right, 0px))
+          max(24px, env(safe-area-inset-bottom, 0px))
+          max(24px, env(safe-area-inset-left, 0px));
       }
       .card {
         max-width: 440px;
@@ -71,13 +75,13 @@
   <body>
     <main class="card">
       <div class="logo-wrap">
-        <img src="/assets/aistudio/file_00000000d4ac8243a4a41ff6e2cc5b63_b707e5fc.png" alt="Bercali Store — O futuro das compras começa aqui." />
+        <img src="/pwa-192x192.png" width="120" height="120" alt="Bercali Store — O futuro das compras começa aqui." />
       </div>
-      <h1>Estás sem ligação à internet</h1>
+      <h1>Sem ligação à internet</h1>
       <p>
-        Podes continuar a consultar as páginas já guardadas no teu dispositivo. Para enviar uma encomenda pelo WhatsApp, restabelece primeiro a ligação à internet.
+        Verifica a tua ligação Wi-Fi ou dados móveis e tenta novamente para ver os produtos e preços atualizados em tempo real.
       </p>
-      <button type="button" onclick="window.location.href='/'">Tentar novamente</button>
+      <button type="button" onclick="window.location.reload()">Tentar novamente</button>
     </main>
   </body>
 </html>

@@ -21,7 +21,7 @@ export const STORE_CONFIG = {
   currencySymbol: 'Kz',
   defaultWhatsappGreeting: 'Olá, Bercali Store! Gostaria de receber informações sobre os vossos produtos.',
   deliveryInfo:
-    'A disponibilidade, o prazo e a taxa de entrega são confirmados diretamente pela equipa da Bercali Store no WhatsApp, de acordo com a tua localização.',
+    'Entregamos em Luanda e Bengo. A disponibilidade, o prazo e a taxa de entrega são confirmados diretamente pela equipa da Bercali Store no WhatsApp, de acordo com a tua localização.',
   paymentInfo:
     'As opções de pagamento disponíveis são informadas e combinadas diretamente com a loja no momento da confirmação da encomenda pelo WhatsApp.',
   orderDisclaimer:
@@ -29,33 +29,7 @@ export const STORE_CONFIG = {
 } as const;
 
 /**
- * Regras opcionais de taxa de entrega por província / município (em Kz).
- * Mantido vazio por predefinição para apresentar "A confirmar pela loja" quando não há valor fixado.
- * Exemplo de configuração futura:
- *   { province: 'Luanda', municipality: 'Talatona', feeKz: 2000 }
+ * Regras de zonas de entrega por província (em Kz).
+ * Na loja pública são lidas dinamicamente de `store_settings > delivery_zones` no Supabase.
  */
 export const DELIVERY_FEE_RULES: DeliveryFeeRule[] = [];
-
-export const ANGOLA_PROVINCES: readonly string[] = [
-  'Bengo',
-  'Benguela',
-  'Bié',
-  'Cabinda',
-  'Cuando',
-  'Cubango',
-  'Cuanza Norte',
-  'Cuanza Sul',
-  'Cunene',
-  'Huambo',
-  'Huíla',
-  'Icolo e Bengo',
-  'Luanda',
-  'Lunda Norte',
-  'Lunda Sul',
-  'Malanje',
-  'Moxico',
-  'Moxico Leste',
-  'Namibe',
-  'Uíge',
-  'Zaire',
-];

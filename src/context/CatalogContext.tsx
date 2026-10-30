@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { supabase, SUPABASE_CONFIG_STATUS } from '../lib/supabase';
-import { fetchStorefrontCatalog } from '../services/storefrontApi';
+import { fetchProductMediaGallery, fetchStorefrontCatalog } from '../services/storefrontApi';
 import type {
   DeliveryFeeRule,
   Product,
@@ -49,6 +49,7 @@ interface CatalogContextValue {
   hasWhatsApp: boolean;
   deliveryFeeRules: DeliveryFeeRule[];
   refreshCatalog: (options?: RefreshCatalogOptions) => Promise<void>;
+  loadProductGallery: (productId: string, sku?: string) => Promise<void>;
 }
 
 const CatalogContext = createContext<CatalogContextValue | undefined>(undefined);
@@ -73,6 +74,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const hasLoadedOnceRef = useRef<boolean>(false);
   const hasProductsRef = useRef<boolean>(false);
   const isFetchingRef = useRef<boolean>(false);
+  const hydratedGalleriesRef = useRef<Set<string>>(new Set());
 
   const loadCatalog = useCallback(async (options?: RefreshCatalogOptions) => {
     const requestedSilent = Boolean(options?.silent);
@@ -100,6 +102,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
+      hydratedGalleriesRef.current.clear();
       hasProductsRef.current = result.products.length > 0;
       syncMetaPixelRuntime(result.marketingSettings, readStoredCookieConsent());
       setProducts(result.products);
@@ -113,6 +116,46 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       isFetchingRef.current = false;
     }
+  }, []);
+
+  const loadProductGallery = useCallback(async (productId: string, sku?: string) => {
+    const cleanId = productId.trim();
+    if (!cleanId || hydratedGalleriesRef.current.has(cleanId)) {
+      return;
+    }
+    hydratedGalleriesRef.current.add(cleanId);
+
+    const gallery = await fetchProductMediaGallery(cleanId, sku);
+    if (!gallery) {
+      hydratedGalleriesRef.current.delete(cleanId);
+      return;
+    }
+
+    setProducts((prev) => {
+      const idx = prev.findIndex((item) => item.id === cleanId);
+      if (idx === -1) return prev;
+      const current = prev[idx];
+      const mergedImages =
+        gallery.images.length > 0
+          ? Array.from(new Set([...gallery.images, ...current.images]))
+          : current.images;
+      const mergedVideo = gallery.video ?? current.video;
+
+      const sameImages =
+        mergedImages.length === current.images.length &&
+        mergedImages.every((src, i) => src === current.images[i]);
+      if (sameImages && mergedVideo === current.video) {
+        return prev;
+      }
+
+      const next = [...prev];
+      next[idx] = {
+        ...current,
+        images: mergedImages,
+        video: mergedVideo,
+      };
+      return next;
+    });
   }, []);
 
   // Carregamento inicial
@@ -241,6 +284,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       hasWhatsApp,
       deliveryFeeRules: storeSettings.deliveryFeeRules,
       refreshCatalog: loadCatalog,
+      loadProductGallery,
     }),
     [
       products,
@@ -254,6 +298,7 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({ child
       accessNotice,
       hasWhatsApp,
       loadCatalog,
+      loadProductGallery,
     ]
   );
 

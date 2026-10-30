@@ -362,6 +362,8 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                               width={900}
                               height={900}
                               loading={idx === 0 ? 'eager' : 'lazy'}
+                              fetchPriority={idx === 0 ? 'high' : 'auto'}
+                              decoding="async"
                               referrerPolicy="no-referrer"
                               onError={() =>
                                 setBrokenIndices((prev) => ({ ...prev, [idx]: true }))
@@ -452,6 +454,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                       width={136}
                       height={136}
                       loading="lazy"
+                      decoding="async"
                       referrerPolicy="no-referrer"
                       className="h-full w-full object-contain"
                     />
@@ -522,6 +525,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                   alt={`${product.name} — fotografia ${activeIndex + 1} de ${product.images.length}`}
                   width={1400}
                   height={1400}
+                  decoding="async"
                   referrerPolicy="no-referrer"
                   draggable={false}
                   className={

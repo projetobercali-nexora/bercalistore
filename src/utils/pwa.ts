@@ -56,15 +56,132 @@ export interface ManualInstallGuide {
   contextNotice?: string;
 }
 
+export type InstallFallbackCaseId =
+  | 'in-app'
+  | 'ios-safari'
+  | 'ios-other'
+  | 'samsung'
+  | 'firefox-android'
+  | 'chromium-no-event';
+
+export interface InstallFallbackOptions {
+  brandName?: string;
+  currentUrl?: string;
+  wasRecentlyDismissed?: boolean;
+  wasPreviouslyInstalled?: boolean;
+}
+
+export interface InstallFallbackInstruction {
+  caseId: InstallFallbackCaseId;
+  deviceLabel: string;
+  title: string;
+  primaryInstruction: string;
+  statusNote?: string;
+  secondaryHelper?: string;
+  contextNotice?: string;
+  showCopyLinkButton: boolean;
+  showOpenInChromeButton: boolean;
+  copyUrl: string;
+  openInChromeUrl: string;
+}
+
+export const PWA_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const IN_APP_INSTALL_INSTRUCTION = 'Para instalar, abre a loja no Chrome';
+
+export const IOS_SAFARI_INSTALL_INSTRUCTION =
+  'Toca em Partilhar e depois em Adicionar ao ecrã principal';
+
+export const IOS_OTHER_BROWSER_INSTALL_INSTRUCTION = 'Abre esta página no Safari';
+
+export const SAMSUNG_INTERNET_INSTALL_INSTRUCTION =
+  'Menu (≡) > Adicionar página a > Ecrã inicial';
+
+export const FIREFOX_ANDROID_INSTALL_INSTRUCTION = 'Menu (⋮) > Instalar';
+
+export const CHROME_EDGE_NO_EVENT_INSTALL_INSTRUCTION =
+  'Menu (⋮) > Instalar app ou Adicionar ao ecrã inicial';
+
+export function isPWADebugQueryEnabled(search: string | null | undefined): boolean {
+  if (!search) return false;
+  try {
+    const normalized = search.startsWith('?') ? search : `?${search}`;
+    return new URLSearchParams(normalized).get('debug') === 'pwa';
+  } catch {
+    return false;
+  }
+}
+
+export function isPWAInviteDismissed(
+  rawValue: string | null | undefined,
+  nowMs = Date.now()
+): boolean {
+  if (!rawValue) return false;
+  const trimmed = rawValue.trim();
+  if (!trimmed) return false;
+  const dismissedAt = Number(trimmed);
+  if (!Number.isFinite(dismissedAt) || dismissedAt <= 0) {
+    return false;
+  }
+  const elapsed = Math.max(0, nowMs - dismissedAt);
+  return elapsed < PWA_DISMISS_DURATION_MS;
+}
+
+export function serializePWADismissTimestamp(nowMs = Date.now()): string {
+  return String(Math.floor(nowMs));
+}
+
 export function isStandaloneDisplayMode(input: StandaloneDetectionInput): boolean {
   if (input.standaloneMediaMatches) return true;
   if (input.fullscreenMediaMatches) return true;
-  if (input.minimalUiMediaMatches) return true;
   if (input.navigatorStandalone === true) return true;
   if (typeof input.referrer === 'string' && input.referrer.startsWith('android-app://')) {
     return true;
   }
   return false;
+}
+
+export function buildCleanShareableStoreUrl(rawUrl: string): string {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) return '/';
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.searchParams.get('debug') === 'pwa') {
+      parsed.searchParams.delete('debug');
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
+export function buildAndroidChromeIntentUrl(rawUrl: string): string {
+  const cleanUrl = buildCleanShareableStoreUrl(rawUrl);
+  try {
+    const parsed = new URL(cleanUrl);
+    const host = parsed.host;
+    const path = `${parsed.pathname || '/'}${parsed.search}${parsed.hash}`;
+    return `intent://${host}${path}#Intent;scheme=https;package=com.android.chrome;end`;
+  } catch {
+    const withoutScheme = cleanUrl.replace(/^https?:\/\//i, '');
+    const normalized = withoutScheme.includes('/') ? withoutScheme : `${withoutScheme}/`;
+    return `intent://${normalized}#Intent;scheme=https;package=com.android.chrome;end`;
+  }
+}
+
+export function buildOpenInChromeUrl(rawUrl: string, env: InstallEnvironmentInfo): string {
+  const cleanUrl = buildCleanShareableStoreUrl(rawUrl);
+  if (env.isAndroid || !env.isIOS) {
+    return buildAndroidChromeIntentUrl(cleanUrl);
+  }
+  try {
+    const parsed = new URL(cleanUrl);
+    const scheme = parsed.protocol === 'http:' ? 'googlechrome' : 'googlechromes';
+    const path = `${parsed.pathname || '/'}${parsed.search}${parsed.hash}`;
+    return `${scheme}://${parsed.host}${path}`;
+  } catch {
+    return cleanUrl;
+  }
 }
 
 export function detectInstallEnvironment(input: InstallEnvironmentInput): InstallEnvironmentInfo {
@@ -91,13 +208,15 @@ export function detectInstallEnvironment(input: InstallEnvironmentInput): Instal
   }
 
   let inAppName: string | null = null;
-  if (/whatsapp/i.test(ua)) {
+  if (/whatsapp|waios/i.test(ua)) {
     inAppName = 'WhatsApp';
+  } else if (/\bmessenger\b|fban\/messenger|fb_iab\/messenger|orca-android/i.test(ua)) {
+    inAppName = 'Messenger';
   } else if (/instagram/i.test(ua)) {
     inAppName = 'Instagram';
-  } else if (/fban|fbav|fb_iab/i.test(ua)) {
+  } else if (/fban|fbav|fb_iab|fb4a|fbsv/i.test(ua)) {
     inAppName = 'Facebook';
-  } else if (/bytedancewebview|musical_ly|tiktok/i.test(ua)) {
+  } else if (/bytedancewebview|musical_ly|tiktok|trill/i.test(ua)) {
     inAppName = 'TikTok';
   } else if (/telegram/i.test(ua)) {
     inAppName = 'Telegram';
@@ -112,14 +231,19 @@ export function detectInstallEnvironment(input: InstallEnvironmentInput): Instal
     browser = 'in-app';
   } else if (/samsungbrowser/i.test(uaLower)) {
     browser = 'samsung';
-  } else if (/edg|edga|edgios/i.test(uaLower)) {
+  } else if (/edg\/|edga\/|edgios\//i.test(uaLower) || /\bedg\b/i.test(uaLower)) {
     browser = 'edge';
-  } else if (/opr\/|opera/i.test(uaLower)) {
+  } else if (/opr\/|opera|opios/i.test(uaLower)) {
     browser = 'opera';
   } else if (/firefox|fxios/i.test(uaLower)) {
     browser = 'firefox';
   } else if (/crios|chrome|chromium/i.test(uaLower)) {
     browser = 'chrome';
+  } else if (
+    isIOS &&
+    /gsa\/|duckduckgo|yabrowser|alohabrowser|brave|focus/i.test(uaLower)
+  ) {
+    browser = 'other';
   } else if (/safari/i.test(uaLower)) {
     browser = 'safari';
   }
@@ -139,66 +263,171 @@ export function detectInstallEnvironment(input: InstallEnvironmentInput): Instal
 
 function buildContextNotice(env: InstallEnvironmentInfo): string | undefined {
   if (!env.isSecureContext) {
-    return 'A instalação direta da aplicação exige que a loja seja acedida através de uma ligação segura HTTPS.';
+    return 'A instalação da app exige ligação segura HTTPS.';
   }
   if (env.isInIframe) {
-    return 'Estás a visualizar a loja numa janela incorporada (pré-visualização). Para que o navegador permita a instalação direta, abre o endereço público HTTPS da loja numa aba autónoma.';
+    return 'Estás numa janela incorporada (pré-visualização). Abre o endereço HTTPS da loja num separador normal para instalar.';
   }
   return undefined;
+}
+
+export function resolveInstallFallbackInstruction(
+  env: InstallEnvironmentInfo,
+  options: InstallFallbackOptions = {}
+): InstallFallbackInstruction {
+  const cleanBrand = (options.brandName || 'Bercali Store').trim() || 'Bercali Store';
+  const rawUrl = options.currentUrl || 'https://bercalistore.ao/';
+  const copyUrl = buildCleanShareableStoreUrl(rawUrl);
+  const openInChromeUrl = buildOpenInChromeUrl(rawUrl, env);
+  const contextNotice = buildContextNotice(env);
+
+  // a) Navegador interno (WhatsApp, Facebook, Instagram, TikTok, Messenger, etc.)
+  if (env.isInAppBrowser) {
+    const appLabel = env.inAppName || 'aplicação atual';
+    return {
+      caseId: 'in-app',
+      deviceLabel: `Navegador interno · ${appLabel}`,
+      title: `Instalar ${cleanBrand}`,
+      primaryInstruction: IN_APP_INSTALL_INSTRUCTION,
+      secondaryHelper: env.isIOS
+        ? 'No iPhone/iPad, podes também copiar o link e abrir no Safari (Partilhar > Adicionar ao ecrã principal).'
+        : undefined,
+      contextNotice,
+      showCopyLinkButton: true,
+      showOpenInChromeButton: true,
+      copyUrl,
+      openInChromeUrl,
+    };
+  }
+
+  // b) iPhone / iPad
+  if (env.isIOS) {
+    if (env.browser === 'safari') {
+      return {
+        caseId: 'ios-safari',
+        deviceLabel: 'iPhone / iPad · Safari',
+        title: `Instalar ${cleanBrand}`,
+        primaryInstruction: IOS_SAFARI_INSTALL_INSTRUCTION,
+        contextNotice,
+        showCopyLinkButton: false,
+        showOpenInChromeButton: false,
+        copyUrl,
+        openInChromeUrl,
+      };
+    }
+
+    return {
+      caseId: 'ios-other',
+      deviceLabel: 'iPhone / iPad',
+      title: `Instalar ${cleanBrand}`,
+      primaryInstruction: IOS_OTHER_BROWSER_INSTALL_INSTRUCTION,
+      secondaryHelper:
+        'Copia o link abaixo, cola no Safari e toca em Partilhar > Adicionar ao ecrã principal.',
+      contextNotice,
+      showCopyLinkButton: true,
+      showOpenInChromeButton: false,
+      copyUrl,
+      openInChromeUrl,
+    };
+  }
+
+  // c) Samsung Internet
+  if (env.browser === 'samsung') {
+    return {
+      caseId: 'samsung',
+      deviceLabel: 'Samsung Internet',
+      title: `Instalar ${cleanBrand}`,
+      primaryInstruction: SAMSUNG_INTERNET_INSTALL_INSTRUCTION,
+      contextNotice,
+      showCopyLinkButton: false,
+      showOpenInChromeButton: false,
+      copyUrl,
+      openInChromeUrl,
+    };
+  }
+
+  // d) Firefox Android
+  if (env.isAndroid && env.browser === 'firefox') {
+    return {
+      caseId: 'firefox-android',
+      deviceLabel: 'Firefox Android',
+      title: `Instalar ${cleanBrand}`,
+      primaryInstruction: FIREFOX_ANDROID_INSTALL_INSTRUCTION,
+      contextNotice,
+      showCopyLinkButton: false,
+      showOpenInChromeButton: false,
+      copyUrl,
+      openInChromeUrl,
+    };
+  }
+
+  // e) Chrome / Edge (ou outro navegador) sem evento beforeinstallprompt
+  let statusNote: string;
+  if (options.wasPreviouslyInstalled && options.wasRecentlyDismissed) {
+    statusNote =
+      'Esta app já foi instalada anteriormente ou dispensada recentemente neste navegador. Verifica o ecrã inicial ou instala pelo menu (⋮).';
+  } else if (options.wasPreviouslyInstalled) {
+    statusNote =
+      'Esta app já parece estar instalada neste dispositivo. Procura «Bercali» no ecrã inicial ou usa o menu (⋮) para abrir.';
+  } else if (options.wasRecentlyDismissed) {
+    statusNote =
+      'O pedido de instalação foi dispensado recentemente, por isso a janela automática não apareceu agora. Podes instalar pelo menu (⋮).';
+  } else {
+    statusNote =
+      'Se a app já estiver instalada no telemóvel ou tiver sido dispensada recentemente, o aviso automático não aparece — verifica o ecrã inicial ou usa o menu (⋮).';
+  }
+
+  const deviceLabel =
+    env.browser === 'edge'
+      ? env.isAndroid
+        ? 'Android · Microsoft Edge'
+        : 'Microsoft Edge'
+      : env.browser === 'chrome'
+      ? env.isAndroid
+        ? 'Android · Google Chrome'
+        : 'Google Chrome'
+      : env.isAndroid
+      ? 'Android · Navegador'
+      : 'Navegador';
+
+  return {
+    caseId: 'chromium-no-event',
+    deviceLabel,
+    title: `Instalar ${cleanBrand}`,
+    primaryInstruction: CHROME_EDGE_NO_EVENT_INSTALL_INSTRUCTION,
+    statusNote,
+    contextNotice,
+    showCopyLinkButton: false,
+    showOpenInChromeButton: false,
+    copyUrl,
+    openInChromeUrl,
+  };
 }
 
 export function getAndroidInstallGuide(
   brandName = 'Bercali Store',
   env?: InstallEnvironmentInfo
 ): ManualInstallGuide {
-  const cleanBrand = brandName.trim() || 'Bercali Store';
-  const contextNotice = env ? buildContextNotice(env) : undefined;
-
-  if (env?.browser === 'samsung') {
-    return {
-      id: 'android',
-      deviceLabel: 'Android · Samsung Internet',
-      title: `Instalar ${cleanBrand} no Android`,
-      description:
-        'O teu navegador permite adicionar a loja ao ecrã principal como uma aplicação:',
-      steps: [
-        'Toca no ícone de transferência na barra de endereço ou abre o menu inferior no canto direito.',
-        'Seleciona «Adicionar página a» e escolhe «Ecrã principal» (ou «Instalar aplicação»).',
-        'Confirma em «Adicionar» para criar o ícone oficial da Bercali no teu telemóvel.',
-      ],
-      contextNotice,
-    };
-  }
-
-  if (env?.browser === 'firefox') {
-    return {
-      id: 'android',
-      deviceLabel: 'Android · Firefox',
-      title: `Instalar ${cleanBrand} no Android`,
-      description: 'Segue estes passos no Firefox para Android:',
-      steps: [
-        'Toca no botão de menu (três pontos) junto à barra de endereço.',
-        'Seleciona «Instalar» (ou «Adicionar ao ecrã inicial»).',
-        'Confirma para abrir a Bercali diretamente a partir do teu ecrã principal.',
-      ],
-      contextNotice,
-    };
-  }
-
+  const effectiveEnv: InstallEnvironmentInfo = env ?? {
+    os: 'android',
+    browser: 'chrome',
+    isIOS: false,
+    isAndroid: true,
+    isMobile: true,
+    isInAppBrowser: false,
+    inAppName: null,
+    isSecureContext: true,
+    isInIframe: false,
+  };
+  const resolved = resolveInstallFallbackInstruction(effectiveEnv, { brandName });
   return {
     id: 'android',
-    deviceLabel: 'Android · Chrome / Edge',
-    title: `Instalar ${cleanBrand} no Android`,
-    description:
-      'Quando o pedido automático não aparece de imediato, podes instalar pelo menu do navegador:',
-    steps: [
-      'Toca no menu do navegador (três pontos no canto superior direito do Chrome ou Edge).',
-      'Escolhe «Instalar aplicação» (ou «Adicionar ao ecrã principal»).',
-      'Toca em «Instalar» para confirmar. O ícone da Bercali aparecerá junto às tuas aplicações.',
-    ],
-    secondaryTip:
-      'Se abriste o link dentro do WhatsApp ou Instagram, escolhe primeiro «Abrir no Chrome» no menu superior.',
-    contextNotice,
+    deviceLabel: resolved.deviceLabel,
+    title: `${resolved.title} no Android`,
+    description: resolved.primaryInstruction,
+    steps: [resolved.primaryInstruction],
+    secondaryTip: resolved.statusNote,
+    contextNotice: resolved.contextNotice,
   };
 }
 
@@ -206,39 +435,26 @@ export function getIOSInstallGuide(
   brandName = 'Bercali Store',
   env?: InstallEnvironmentInfo
 ): ManualInstallGuide {
-  const cleanBrand = brandName.trim() || 'Bercali Store';
-  const contextNotice = env ? buildContextNotice(env) : undefined;
-
-  if (env?.isIOS && env.browser !== 'safari' && !env.isInAppBrowser) {
-    return {
-      id: 'ios',
-      deviceLabel: 'iPhone / iPad',
-      title: `Instalar ${cleanBrand} no iPhone ou iPad`,
-      description:
-        'Nos dispositivos Apple, a instalação é feita através do menu Partilhar do navegador (recomendado usar o Safari):',
-      steps: [
-        'Toca no ícone «Partilhar» (quadrado com seta para cima) na barra de endereço ou abre este link no Safari.',
-        'Desliza a lista de opções para baixo e toca em «Adicionar ao ecrã principal».',
-        'Toca em «Adicionar» no canto superior direito para criar o ícone da Bercali.',
-      ],
-      contextNotice,
-    };
-  }
-
+  const effectiveEnv: InstallEnvironmentInfo = env ?? {
+    os: 'ios',
+    browser: 'safari',
+    isIOS: true,
+    isAndroid: false,
+    isMobile: true,
+    isInAppBrowser: false,
+    inAppName: null,
+    isSecureContext: true,
+    isInIframe: false,
+  };
+  const resolved = resolveInstallFallbackInstruction(effectiveEnv, { brandName });
   return {
     id: 'ios',
-    deviceLabel: 'iPhone / iPad · Safari',
-    title: `Instalar ${cleanBrand} no iPhone / Safari`,
-    description:
-      'O Safari no iPhone e iPad não mostra janela automática de instalação, mas permite instalar em 3 toques:',
-    steps: [
-      'Toca no botão «Partilhar» (ícone quadrado com seta para cima) na barra inferior ou superior do Safari.',
-      'Desliza as opções para cima e seleciona «Adicionar ao ecrã principal».',
-      'Confirma em «Adicionar» no canto superior direito. A Bercali abrirá como aplicação autónoma.',
-    ],
-    secondaryTip:
-      'Certifica-te de que estás no Safari (e não dentro da janela interna do WhatsApp ou Instagram).',
-    contextNotice,
+    deviceLabel: resolved.deviceLabel,
+    title: `${resolved.title} no iPhone / iPad`,
+    description: resolved.primaryInstruction,
+    steps: [resolved.primaryInstruction],
+    secondaryTip: resolved.secondaryHelper,
+    contextNotice: resolved.contextNotice,
   };
 }
 
@@ -246,77 +462,15 @@ export function getManualInstallGuide(
   env: InstallEnvironmentInfo,
   brandName = 'Bercali Store'
 ): ManualInstallGuide {
-  const cleanBrand = brandName.trim() || 'Bercali Store';
-  const contextNotice = buildContextNotice(env);
-
-  if (env.isInAppBrowser) {
-    const appLabel = env.inAppName ?? 'aplicação atual';
-    const targetBrowser = env.isIOS ? 'Safari' : 'Google Chrome';
-    return {
-      id: 'auto',
-      deviceLabel: `Navegador interno (${appLabel})`,
-      title: `Abrir no ${targetBrowser} para instalar`,
-      description: `Estás a ver a loja dentro do navegador interno do ${appLabel}, que bloqueia a instalação direta de aplicações.`,
-      steps: [
-        `Toca no menu no canto superior (${env.isIOS ? 'três pontos ou ícone do Safari' : 'três pontos'}).`,
-        `Seleciona «Abrir no ${targetBrowser}» ou «Abrir no navegador externo».`,
-        env.isIOS
-          ? 'No Safari, toca em «Partilhar» e depois em «Adicionar ao ecrã principal».'
-          : 'No Chrome, toca novamente em «INSTALAR APP» no rodapé da loja.',
-      ],
-      contextNotice,
-    };
-  }
-
-  if (env.isIOS) {
-    return getIOSInstallGuide(cleanBrand, env);
-  }
-
-  if (env.isAndroid) {
-    return getAndroidInstallGuide(cleanBrand, env);
-  }
-
-  if (env.os === 'macos' && env.browser === 'safari') {
-    return {
-      id: 'auto',
-      deviceLabel: 'Mac · Safari',
-      title: `Instalar ${cleanBrand} no Mac`,
-      description: 'No Safari para macOS podes adicionar a loja diretamente à Dock:',
-      steps: [
-        'Na barra de menus superior do Mac, clica em «Ficheiro» (ou no botão Partilhar do Safari).',
-        'Seleciona «Adicionar à Dock...».',
-        'Confirma em «Adicionar» para abrir a loja como aplicação dedicada.',
-      ],
-      contextNotice,
-    };
-  }
-
-  if (env.browser === 'firefox') {
-    return {
-      id: 'auto',
-      deviceLabel: 'Computador · Firefox',
-      title: `Como instalar a ${cleanBrand}`,
-      description:
-        'O Firefox para computador não suporta atualmente a instalação direta de lojas PWA como janela autónoma.',
-      steps: [
-        'No telemóvel Android (Chrome, Edge, Samsung Internet ou Firefox) ou no iPhone (Safari), abre o endereço da loja para instalares o ícone no ecrã principal.',
-        'Em computador, podes utilizar o Google Chrome ou Microsoft Edge para instalar a aplicação no sistema.',
-      ],
-      contextNotice,
-    };
-  }
-
+  const resolved = resolveInstallFallbackInstruction(env, { brandName });
   return {
-    id: 'auto',
-    deviceLabel: 'Computador · Chrome / Edge',
-    title: `Instalar ${cleanBrand} no computador ou telemóvel`,
-    description:
-      'O pedido automático do navegador não está ativo neste momento. Podes instalar manualmente:',
-    steps: [
-      'Em Chrome ou Edge no computador, clica no ícone de instalação no lado direito da barra de endereço (ou abre o menu de três pontos, «Guardar e partilhar / Aplicações» e «Instalar Bercali Store»).',
-      'Se preferires instalar no telemóvel, abre o site no Chrome (Android) ou Safari (iPhone) e consulta abaixo os passos para cada sistema.',
-    ],
-    contextNotice,
+    id: env.isIOS && !env.isInAppBrowser ? 'ios' : env.isAndroid && !env.isInAppBrowser ? 'android' : 'auto',
+    deviceLabel: resolved.deviceLabel,
+    title: resolved.title,
+    description: resolved.primaryInstruction,
+    steps: [resolved.primaryInstruction],
+    secondaryTip: resolved.statusNote ?? resolved.secondaryHelper,
+    contextNotice: resolved.contextNotice,
   };
 }
 

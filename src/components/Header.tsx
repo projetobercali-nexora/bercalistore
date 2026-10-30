@@ -2,14 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
-import { useCart } from '../context/CartContext';
+import { useCartCount } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
 import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { trackMetaContact } from '../utils/metaPixel';
 import { BrandLogo } from './BrandLogo';
 
 export const Header: React.FC = () => {
-  const { totalItemsCount } = useCart();
+  const totalItemsCount = useCartCount();
   const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();

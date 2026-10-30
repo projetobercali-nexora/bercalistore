@@ -48,6 +48,7 @@ export const ProductDetailPage: React.FC = () => {
     whatsappNumber,
     hasWhatsApp,
     refreshCatalog,
+    loadProductGallery,
   } = useCatalog();
   const { addItem, getQuantityInCart } = useCart();
 
@@ -80,6 +81,11 @@ export const ProductDetailPage: React.FC = () => {
       window.removeEventListener(META_PIXEL_READY_EVENT, tryTrackViewContent);
     };
   }, [product]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    void loadProductGallery(product.id, product.sku);
+  }, [product?.id, product?.sku, loadProductGallery]);
 
   const relatedProducts = useMemo(
     () => (product ? getRelatedProducts(products, product, 4) : []),

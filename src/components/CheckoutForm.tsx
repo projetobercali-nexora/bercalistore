@@ -1,11 +1,15 @@
 import React from 'react';
-import { ANGOLA_PROVINCES } from '../config/store';
 import type {
   CheckoutValidationErrors,
   CustomerCheckoutData,
   DeliveryFeeRule,
 } from '../types/store';
-import { getDeliveryRuleLabel } from '../utils/checkout';
+import {
+  findMatchingDeliveryZone,
+  getDeliveryRuleLabel,
+  getMunicipalityPlaceholder,
+  NO_ACTIVE_DELIVERY_ZONES_MESSAGE,
+} from '../utils/checkout';
 import { formatKz } from '../utils/format';
 
 interface CheckoutFormProps {
@@ -14,6 +18,7 @@ interface CheckoutFormProps {
   onChange: (field: keyof CustomerCheckoutData, value: string) => void;
   deliveryZones?: readonly DeliveryFeeRule[];
   onSelectDeliveryZone?: (zoneLabel: string, matchedRule?: DeliveryFeeRule) => void;
+  loadingZones?: boolean;
   disabled?: boolean;
 }
 
@@ -23,6 +28,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
   onChange,
   deliveryZones = [],
   onSelectDeliveryZone,
+  loadingZones = false,
   disabled = false,
 }) => {
   const inputBase =
@@ -32,6 +38,14 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
     hasError ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-white/15 focus:border-[#FF8A00]';
 
   const hasConfiguredZones = deliveryZones.length > 0;
+  const selectedRule = findMatchingDeliveryZone(deliveryZones, {
+    deliveryZoneId: values.deliveryZoneId,
+    deliveryZone: values.deliveryZone,
+    province: values.province,
+  });
+  const selectedProvinceOption = selectedRule ? getDeliveryRuleLabel(selectedRule) : '';
+  const provinceError = errors.province ?? errors.deliveryZone;
+  const municipalityPlaceholder = getMunicipalityPlaceholder(values.province);
 
   return (
     <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-6">
@@ -40,9 +54,8 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
           Dados para entrega
         </h2>
         <p className="mt-1 text-sm text-[#8A8A8A]">
-          Indica o teu nome e telefone{hasConfiguredZones ? ' e escolhe a zona de entrega' : ''}{' '}
-          para registarmos a tua encomenda. Os campos com{' '}
-          <span className="text-[#FF8A00] font-semibold">*</span> são obrigatórios.
+          Indica o teu nome, telefone e província de entrega para registarmos a tua encomenda. Os
+          campos com <span className="text-[#FF8A00] font-semibold">*</span> são obrigatórios.
         </p>
       </div>
 
@@ -126,88 +139,72 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
           )}
         </div>
 
-        {/* Zona de entrega configurada no Painel (quando existirem zonas em store_settings) */}
-        {hasConfiguredZones && (
-          <div className="sm:col-span-2">
-            <label
-              htmlFor="checkout-deliveryZone"
-              className="block text-sm font-medium text-white mb-1.5"
-            >
-              Zona de entrega <span className="text-[#FF8A00]">*</span>
-            </label>
-            <select
-              id="checkout-deliveryZone"
-              name="deliveryZone"
-              disabled={disabled}
-              value={values.deliveryZone ?? ''}
-              onChange={(e) => {
-                const chosen = e.target.value;
-                const matched = deliveryZones.find(
-                  (rule) => getDeliveryRuleLabel(rule) === chosen
-                );
-                if (onSelectDeliveryZone) {
-                  onSelectDeliveryZone(chosen, matched);
-                } else {
-                  onChange('deliveryZone', chosen);
-                }
-              }}
-              aria-required="true"
-              aria-invalid={Boolean(errors.deliveryZone)}
-              aria-describedby={errors.deliveryZone ? 'error-deliveryZone' : undefined}
-              className={`${inputBase} ${borderClass(Boolean(errors.deliveryZone))}`}
-            >
-              <option value="">Seleciona a zona de entrega</option>
-              {deliveryZones.map((rule, idx) => {
-                const label = getDeliveryRuleLabel(rule);
-                const feeText = rule.feeKz === 0 ? 'Grátis' : formatKz(rule.feeKz);
-                return (
-                  <option
-                    key={`zone-opt-${idx}-${label}`}
-                    value={label}
-                    className="bg-[#0A0A0A] text-white"
-                  >
-                    {label} — {feeText}
-                  </option>
-                );
-              })}
-            </select>
-            {errors.deliveryZone && (
-              <p
-                id="error-deliveryZone"
-                role="alert"
-                className="mt-1.5 text-xs font-medium text-[#EF4444]"
-              >
-                {errors.deliveryZone}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Província (opcional) */}
+        {/* Província de entrega * (apenas zonas ativas da base de dados) */}
         <div>
           <label htmlFor="checkout-province" className="block text-sm font-medium text-white mb-1.5">
-            Província <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+            Província de entrega <span className="text-[#FF8A00]">*</span>
           </label>
           <select
             id="checkout-province"
             name="province"
-            disabled={disabled}
-            value={values.province}
-            onChange={(e) => onChange('province', e.target.value)}
-            aria-invalid={Boolean(errors.province)}
-            aria-describedby={errors.province ? 'error-province' : undefined}
-            className={`${inputBase} ${borderClass(Boolean(errors.province))}`}
+            disabled={disabled || loadingZones || !hasConfiguredZones}
+            value={selectedProvinceOption}
+            onChange={(e) => {
+              const chosen = e.target.value;
+              if (!chosen) {
+                if (onSelectDeliveryZone) {
+                  onSelectDeliveryZone('', undefined);
+                } else {
+                  onChange('province', '');
+                }
+                return;
+              }
+              const matched = deliveryZones.find(
+                (rule) => getDeliveryRuleLabel(rule) === chosen
+              );
+              if (onSelectDeliveryZone) {
+                onSelectDeliveryZone(chosen, matched);
+              } else {
+                onChange('province', matched?.province || chosen);
+              }
+            }}
+            aria-required="true"
+            aria-invalid={Boolean(provinceError) || (!loadingZones && !hasConfiguredZones)}
+            aria-describedby={
+              provinceError || (!loadingZones && !hasConfiguredZones)
+                ? 'error-province'
+                : undefined
+            }
+            className={`${inputBase} ${borderClass(
+              Boolean(provinceError) || (!loadingZones && !hasConfiguredZones)
+            )}`}
           >
-            <option value="">Seleciona a província</option>
-            {ANGOLA_PROVINCES.map((prov) => (
-              <option key={prov} value={prov} className="bg-[#0A0A0A] text-white">
-                {prov}
-              </option>
-            ))}
+            <option value="">
+              {loadingZones
+                ? 'A carregar províncias...'
+                : hasConfiguredZones
+                ? 'Seleciona a província de entrega'
+                : NO_ACTIVE_DELIVERY_ZONES_MESSAGE}
+            </option>
+            {deliveryZones.map((rule, idx) => {
+              const label = getDeliveryRuleLabel(rule);
+              const feeText = rule.feeKz === 0 ? 'Grátis' : formatKz(rule.feeKz);
+              const etaText = rule.estimatedTime ? ` (${rule.estimatedTime})` : '';
+              return (
+                <option
+                  key={`prov-opt-${rule.id ?? idx}-${label}`}
+                  value={label}
+                  className="bg-[#0A0A0A] text-white"
+                >
+                  {label} — {feeText}
+                  {etaText}
+                </option>
+              );
+            })}
           </select>
-          {errors.province && (
+          {(provinceError || (!loadingZones && !hasConfiguredZones)) && (
             <p id="error-province" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
-              {errors.province}
+              {provinceError ?? NO_ACTIVE_DELIVERY_ZONES_MESSAGE}
             </p>
           )}
         </div>
@@ -224,7 +221,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             disabled={disabled}
             value={values.municipality}
             onChange={(e) => onChange('municipality', e.target.value)}
-            placeholder="Ex.: Belas, Viana, Maianga..."
+            placeholder={municipalityPlaceholder}
             aria-invalid={Boolean(errors.municipality)}
             aria-describedby={errors.municipality ? 'error-municipality' : undefined}
             className={`${inputBase} ${borderClass(Boolean(errors.municipality))}`}

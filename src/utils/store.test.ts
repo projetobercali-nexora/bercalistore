@@ -16,7 +16,7 @@ import {
   sanitizeStoredCart,
   updateCartItemQuantity,
 } from './cart';
-import { WHATSAPP_NUMBER } from '../config/store';
+import { STORE_CONFIG, WHATSAPP_NUMBER } from '../config/store';
 import {
   buildWhatsAppContactMessage,
   buildWhatsAppOrderMessage,
@@ -24,10 +24,13 @@ import {
   buildWhatsAppUrl,
   calculateOrderSummary,
   clearConfirmedOrderFromSession,
+  findMatchingDeliveryZone,
   formatInternationalWhatsApp,
+  getMunicipalityPlaceholder,
   hasConfiguredWhatsApp,
   hasValidationErrors,
   isValidWhatsAppNumber,
+  NO_ACTIVE_DELIVERY_ZONES_MESSAGE,
   normalizeWhatsAppNumber,
   readConfirmedOrderFromSession,
   resolveOfficialWhatsAppFromCompanyProfile,
@@ -845,11 +848,12 @@ test('extractPublicStoreSettings reads WhatsApp number and message templates fro
   assert.ok(orderMsg.includes('49.000 Kz'));
 });
 
-test('validateCheckoutForm in storefront mode requires name, phone, and zone only when zones exist', () => {
+test('validateCheckoutForm in storefront mode blocks when no active zones exist and requires an active province (Luanda or Bengo)', () => {
   const baseCustomer = {
     fullName: 'Carlos Mateus',
     phone: '923 123 456',
     deliveryZone: '',
+    deliveryZoneId: '',
     province: '',
     municipality: '',
     neighborhood: '',
@@ -857,26 +861,157 @@ test('validateCheckoutForm in storefront mode requires name, phone, and zone onl
     notes: '',
   };
 
-  // Sem zonas configuradas: apenas nome e telefone são obrigatórios
+  // Sem zonas ativas: mostra "De momento não estamos a aceitar entregas" e impede concluir
   const noZonesErrors = validateCheckoutForm(baseCustomer, {
     mode: 'storefront',
     deliveryZones: [],
   });
-  assert.equal(hasValidationErrors(noZonesErrors), false);
+  assert.equal(hasValidationErrors(noZonesErrors), true);
+  assert.equal(noZonesErrors.province, NO_ACTIVE_DELIVERY_ZONES_MESSAGE);
 
-  // Com zonas configuradas: exige seleção de zona de entrega
-  const zones = [{ zoneName: 'Talatona', province: 'Luanda', feeKz: 2000 }];
-  const missingZoneErrors = validateCheckoutForm(baseCustomer, {
+  // Com Luanda e Bengo ativas: exige escolha de uma província ativa (sem pré-seleção)
+  const zones = [
+    { id: 'zone-luanda', zoneName: 'Luanda', province: 'Luanda', feeKz: 2000, estimatedTime: '24h' },
+    { id: 'zone-bengo', zoneName: 'Bengo', province: 'Bengo', feeKz: 4500, estimatedTime: '24h a 48h' },
+  ];
+  const missingProvinceErrors = validateCheckoutForm(baseCustomer, {
     mode: 'storefront',
     deliveryZones: zones,
   });
-  assert.equal(Boolean(missingZoneErrors.deliveryZone), true);
+  assert.equal(Boolean(missingProvinceErrors.province), true);
 
-  const validWithZoneErrors = validateCheckoutForm(
-    { ...baseCustomer, deliveryZone: 'Talatona' },
+  // Província fora das zonas ativas é rejeitada
+  const inactiveProvinceErrors = validateCheckoutForm(
+    { ...baseCustomer, province: 'Huíla', deliveryZone: 'Huíla' },
     { mode: 'storefront', deliveryZones: zones }
   );
-  assert.equal(hasValidationErrors(validWithZoneErrors), false);
+  assert.equal(Boolean(inactiveProvinceErrors.province), true);
+
+  const validLuandaErrors = validateCheckoutForm(
+    { ...baseCustomer, province: 'Luanda', deliveryZone: 'Luanda', deliveryZoneId: 'zone-luanda' },
+    { mode: 'storefront', deliveryZones: zones }
+  );
+  assert.equal(hasValidationErrors(validLuandaErrors), false);
+
+  const validBengoErrors = validateCheckoutForm(
+    { ...baseCustomer, province: 'Bengo', deliveryZone: 'Bengo', deliveryZoneId: 'zone-bengo' },
+    { mode: 'storefront', deliveryZones: zones }
+  );
+  assert.equal(hasValidationErrors(validBengoErrors), false);
+});
+
+test('delivery_zones from store_settings filters inactive zones, resolves placeholders, sums fee + timeframe, and populates RPC + WhatsApp', () => {
+  assert.ok(STORE_CONFIG.deliveryInfo.includes('Entregamos em Luanda e Bengo'));
+  assert.equal(getMunicipalityPlaceholder('Luanda'), 'Ex.: Belas, Viana, Cazenga...');
+  assert.equal(getMunicipalityPlaceholder('Bengo'), 'Ex.: Caxito, Dande, Dembos...');
+
+  const settingsWithActiveAndInactive = extractPublicStoreSettings([
+    {
+      setting_key: 'delivery_zones',
+      setting_value: [
+        {
+          id: 'uuid-luanda',
+          name: 'Luanda',
+          province: 'Luanda',
+          fee: 2000,
+          estimated_time: 'Mesmo dia / 24h',
+          is_active: true,
+        },
+        {
+          id: 'uuid-bengo',
+          name: 'Bengo',
+          province: 'Bengo',
+          deliveryFee: 4000,
+          prazo: '24h a 48h',
+          active: true,
+        },
+        {
+          id: 'uuid-benguela',
+          name: 'Benguela',
+          province: 'Benguela',
+          fee: 6500,
+          is_active: false,
+        },
+      ],
+    },
+  ]);
+
+  assert.equal(settingsWithActiveAndInactive.deliveryFeeRules.length, 2);
+  assert.deepEqual(
+    settingsWithActiveAndInactive.deliveryFeeRules.map((z) => z.zoneName),
+    ['Luanda', 'Bengo']
+  );
+
+  // Se todas as zonas forem desativadas no painel, deliveryFeeRules fica vazio
+  const settingsAllDisabled = extractPublicStoreSettings([
+    {
+      setting_key: 'delivery_zones',
+      setting_value: [
+        { id: 'uuid-luanda', name: 'Luanda', fee: 2000, is_active: false },
+        { id: 'uuid-bengo', name: 'Bengo', fee: 4000, status: 'inactive' },
+      ],
+    },
+  ]);
+  assert.equal(settingsAllDisabled.deliveryFeeRules.length, 0);
+
+  const bengoZone = findMatchingDeliveryZone(settingsWithActiveAndInactive.deliveryFeeRules, {
+    deliveryZoneId: 'uuid-bengo',
+    province: 'Bengo',
+  });
+  assert.ok(bengoZone);
+  assert.equal(bengoZone.feeKz, 4000);
+  assert.equal(bengoZone.estimatedTime, '24h a 48h');
+
+  const lines = resolveValidatedCartLines(
+    [{ productId: TEST_CATALOG[0].id, quantity: 1 }],
+    TEST_CATALOG
+  );
+  const summaryBengo = calculateOrderSummary(
+    lines,
+    'Bengo',
+    'Dande',
+    settingsWithActiveAndInactive.deliveryFeeRules,
+    { deliveryZone: 'Bengo', deliveryZoneId: 'uuid-bengo' }
+  );
+
+  assert.equal(summaryBengo.productsSubtotalKz, 24500);
+  assert.equal(summaryBengo.delivery.known, true);
+  assert.equal(summaryBengo.delivery.amountKz, 4000);
+  assert.equal(summaryBengo.delivery.estimatedTime, '24h a 48h');
+  assert.equal(summaryBengo.estimatedTotalKz, 28500);
+
+  const customerBengo = {
+    fullName: 'Helena Costa',
+    phone: '923 400 500',
+    deliveryZoneId: 'uuid-bengo',
+    deliveryZone: 'Bengo',
+    province: 'Bengo',
+    municipality: 'Dande',
+    neighborhood: 'Caxito Centro',
+    addressReference: 'Junto ao mercado municipal',
+    notes: '',
+  };
+
+  const rpcArgs = buildCreateStorefrontOrderRpcArgs({
+    customer: customerBengo,
+    summary: summaryBengo,
+    idempotencyKey: 'ORD-BENGO-01',
+    deliveryZones: settingsWithActiveAndInactive.deliveryFeeRules,
+  });
+  assert.equal(rpcArgs.p_delivery_zone_id, 'uuid-bengo');
+  assert.equal(rpcArgs.p_delivery_fee, 4000);
+  assert.equal(rpcArgs.p_customer_city, 'Dande, Bengo');
+
+  const waMsg = buildWhatsAppOrderMessage(
+    customerBengo,
+    summaryBengo,
+    'BRC-20261029-7777',
+    'Bercali Store'
+  );
+  assert.ok(waMsg.includes('Bengo'));
+  assert.ok(waMsg.includes('Dande'));
+  assert.ok(waMsg.includes('4.000 Kz'));
+  assert.ok(waMsg.includes('28.500 Kz'));
 });
 
 test('buildCreateStorefrontOrderRpcArgs builds exact parameter names, UUID productId, integer quantity, and min-3-char address', () => {

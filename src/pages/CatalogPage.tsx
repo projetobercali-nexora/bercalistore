@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { CategoryList } from '../components/CategoryList';
@@ -6,6 +6,7 @@ import { ProductGrid } from '../components/ProductGrid';
 import { SearchBar } from '../components/SearchBar';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
 import { useCatalog } from '../context/CatalogContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { filterProducts } from '../utils/catalog';
 import { trackMetaSearch } from '../utils/metaPixel';
 import { PUBLIC_MESSAGES } from '../utils/publicMessages';
@@ -15,14 +16,38 @@ export const CatalogPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const lastTrackedQueryRef = useRef<string>('');
 
-  const query = searchParams.get('q') ?? '';
+  const urlQuery = searchParams.get('q') ?? '';
+  const [searchInput, setSearchInput] = useState(urlQuery);
+  const debouncedQuery = useDebouncedValue(searchInput, 300);
+
   const selectedCategory = searchParams.get('categoria') ?? 'all';
   const onlyAvailable = searchParams.get('disponiveis') === '1';
   const onlyPromos = searchParams.get('promocoes') === '1';
   const shouldFocusSearch = searchParams.get('foco') === 'pesquisa';
 
   useEffect(() => {
-    const trimmed = query.trim();
+    setSearchInput(urlQuery);
+  }, [urlQuery]);
+
+  useEffect(() => {
+    if (debouncedQuery === urlQuery) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('foco');
+        if (!debouncedQuery.trim()) {
+          next.delete('q');
+        } else {
+          next.set('q', debouncedQuery);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  }, [debouncedQuery, urlQuery, setSearchParams]);
+
+  useEffect(() => {
+    const trimmed = debouncedQuery.trim();
     if (trimmed.length < 2) {
       if (!trimmed) {
         lastTrackedQueryRef.current = '';
@@ -34,19 +59,19 @@ export const CatalogPage: React.FC = () => {
         lastTrackedQueryRef.current = trimmed;
         trackMetaSearch(trimmed);
       }
-    }, 600);
+    }, 300);
     return () => window.clearTimeout(timer);
-  }, [query]);
+  }, [debouncedQuery]);
 
   const filteredProducts = useMemo(
     () =>
       filterProducts(products, {
-        query,
+        query: debouncedQuery,
         category: selectedCategory,
         onlyAvailable,
         onlyPromotions: onlyPromos,
       }),
-    [products, query, selectedCategory, onlyAvailable, onlyPromos]
+    [products, debouncedQuery, selectedCategory, onlyAvailable, onlyPromos]
   );
 
   const updateParam = (key: string, value: string | null) => {
@@ -61,11 +86,15 @@ export const CatalogPage: React.FC = () => {
   };
 
   const resetAllFilters = () => {
+    setSearchInput('');
     setSearchParams({}, { replace: true });
   };
 
   const hasAnyFilter =
-    query.trim().length > 0 || selectedCategory !== 'all' || onlyAvailable || onlyPromos;
+    debouncedQuery.trim().length > 0 ||
+    selectedCategory !== 'all' ||
+    onlyAvailable ||
+    onlyPromos;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6">
@@ -98,8 +127,13 @@ export const CatalogPage: React.FC = () => {
 
       <div className="space-y-3.5">
         <SearchBar
-          value={query}
-          onChange={(val) => updateParam('q', val)}
+          value={searchInput}
+          onChange={(val) => {
+            setSearchInput(val);
+            if (!val.trim()) {
+              updateParam('q', null);
+            }
+          }}
           autoFocus={shouldFocusSearch}
         />
 
@@ -164,7 +198,7 @@ export const CatalogPage: React.FC = () => {
         loading={loading}
         error={error}
         emptyTitle={
-          query.trim().length > 0 || onlyAvailable
+          debouncedQuery.trim().length > 0 || onlyAvailable
             ? 'Nenhum produto encontrado'
             : selectedCategory !== 'all'
             ? 'Sem produtos nesta categoria'
@@ -173,7 +207,7 @@ export const CatalogPage: React.FC = () => {
             : 'Sem produtos disponíveis de momento'
         }
         emptyDescription={
-          query.trim().length > 0 || onlyAvailable
+          debouncedQuery.trim().length > 0 || onlyAvailable
             ? PUBLIC_MESSAGES.emptySearch
             : selectedCategory !== 'all'
             ? PUBLIC_MESSAGES.emptyCategory
