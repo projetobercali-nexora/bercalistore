@@ -5,20 +5,47 @@
   --font-display: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --color-bercali-black: #0A0A0A;
-  --color-bercali-charcoal: #1A1A1A;
+  --color-bercali-charcoal: #171717;
   --color-bercali-orange: #FF8A00;
   --color-bercali-amber: #FFC400;
   --color-bercali-white: #FFFFFF;
-  --color-bercali-gray: #8A8A8A;
-  --color-bercali-light: #F4F4F4;
-  --color-bercali-green: #22C55E;
-  --color-bercali-red: #EF4444;
+  --color-bercali-gray: #5B5B57;
+  --color-bercali-light: #F4F4F2;
+  --color-bercali-green: #15803D;
+  --color-bercali-red: #B91C1C;
+}
+
+:root {
+  color-scheme: light;
+
+  --bg-page: #FAFAF8;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F4F4F2;
+  --bg-logo-box: #0A0A0A;
+
+  --border-subtle: #E7E5E0;
+  --border-input: #D6D3CD;
+
+  --text-primary: #171717;
+  --text-secondary: #5B5B57;
+  --text-on-accent: #0A0A0A;
+
+  --brand-orange: #FF8A00;
+  --brand-yellow: #FFC400;
+  --brand-orange-text: #B45309;
+
+  --status-available: #15803D;
+  --status-error: #B91C1C;
+
+  --shadow-card: 0 1px 3px rgba(23, 23, 23, 0.05), 0 1px 2px rgba(23, 23, 23, 0.03);
+  --shadow-elevated: 0 10px 25px -5px rgba(23, 23, 23, 0.08), 0 4px 10px -4px rgba(23, 23, 23, 0.04);
 }
 
 @layer base {
   html {
-    background-color: #0A0A0A;
-    color: #FFFFFF;
+    color-scheme: light;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
     font-family: var(--font-sans);
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
@@ -26,8 +53,9 @@
   }
 
   body {
-    background-color: #0A0A0A;
-    color: #FFFFFF;
+    color-scheme: light;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
     min-height: 100dvh;
     overflow-x: clip;
     line-height: 1.5;
@@ -39,7 +67,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #FF8A00;
+    outline: 2px solid var(--brand-orange);
     outline-offset: 2px;
   }
 }

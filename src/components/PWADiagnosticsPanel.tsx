@@ -225,19 +225,19 @@ export const PWADiagnosticsPanel: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-diagnostics-title"
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-3 sm:p-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-3 sm:p-4"
       onClick={handleClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl bg-[#161616] border border-white/15 p-4 sm:p-5 shadow-2xl space-y-3 max-h-[calc(100dvh-24px)] overflow-y-auto text-xs text-white"
+        className="w-full max-w-lg rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 sm:p-5 shadow-[var(--shadow-elevated)] space-y-3 max-h-[calc(100dvh-24px)] overflow-y-auto text-xs text-[var(--text-primary)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10">
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-[var(--border-subtle)]">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#FF8A00]">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--brand-orange-text)]">
               Diagnóstico Técnico
             </p>
-            <h2 id="pwa-diagnostics-title" className="font-display text-sm sm:text-base font-bold">
+            <h2 id="pwa-diagnostics-title" className="font-display text-sm sm:text-base font-bold text-[var(--text-primary)]">
               Estado de Instalação PWA
             </h2>
           </div>
@@ -246,7 +246,7 @@ export const PWADiagnosticsPanel: React.FC = () => {
               type="button"
               onClick={() => void runDiagnostics()}
               aria-label="Atualizar diagnóstico PWA"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-[#0A0A0A] text-white/85 hover:border-[#FF8A00] hover:text-[#FF8A00] cursor-pointer"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-input)] bg-[var(--bg-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] cursor-pointer"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -254,7 +254,7 @@ export const PWADiagnosticsPanel: React.FC = () => {
               type="button"
               onClick={handleClose}
               aria-label="Fechar diagnóstico PWA"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#8A8A8A] hover:bg-white/10 hover:text-white cursor-pointer"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -262,58 +262,58 @@ export const PWADiagnosticsPanel: React.FC = () => {
         </div>
 
         <dl className="space-y-2">
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 flex items-center justify-between gap-3">
-            <dt className="text-[#8A8A8A] font-medium">Contexto seguro (HTTPS)</dt>
-            <dd className={environment.isSecureContext ? 'font-bold text-[#22C55E]' : 'font-bold text-red-400'}>
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-secondary)] font-medium">Contexto seguro (HTTPS)</dt>
+            <dd className={environment.isSecureContext ? 'font-bold text-[var(--status-available)]' : 'font-bold text-[var(--status-error)]'}>
               {environment.isSecureContext ? `Sim (${protocol})` : `Não (${protocol})`}
             </dd>
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 space-y-1">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-[#8A8A8A] font-medium">Service Worker registado</dt>
-              <dd className={swDiag.registered ? 'font-bold text-[#22C55E]' : 'font-bold text-[#FFC400]'}>
+              <dt className="text-[var(--text-secondary)] font-medium">Service Worker registado</dt>
+              <dd className={swDiag.registered ? 'font-bold text-[var(--status-available)]' : 'font-bold text-[var(--brand-orange-text)]'}>
                 {swDiag.registered ? 'Sim' : 'Não'}
               </dd>
             </div>
-            <p className="text-[11px] text-white/80">
+            <p className="text-[11px] text-[var(--text-primary)]">
               Estado: {swDiag.stateLabel}
               {swDiag.controllingPage ? ' · A controlar página' : ''}
             </p>
             {swDiag.scriptUrl && (
-              <p className="text-[11px] text-[#8A8A8A] break-all">Script: {swDiag.scriptUrl}</p>
+              <p className="text-[11px] text-[var(--text-secondary)] break-all">Script: {swDiag.scriptUrl}</p>
             )}
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 space-y-1">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-[#8A8A8A] font-medium">Manifest carregado</dt>
-              <dd className={manifestDiag.loaded ? 'font-bold text-[#22C55E]' : 'font-bold text-red-400'}>
+              <dt className="text-[var(--text-secondary)] font-medium">Manifest carregado</dt>
+              <dd className={manifestDiag.loaded ? 'font-bold text-[var(--status-available)]' : 'font-bold text-[var(--status-error)]'}>
                 {manifestDiag.loaded ? `Sim (HTTP ${manifestDiag.httpStatus})` : `Não (${manifestDiag.error || 'erro'})`}
               </dd>
             </div>
-            <p className="text-[11px] text-white/80">
+            <p className="text-[11px] text-[var(--text-primary)]">
               Link HTML: {manifestDiag.linkPresentInDom ? manifestDiag.linkHref : 'Em falta'} · Content-Type:{' '}
               {manifestDiag.contentType || 'n/d'}
             </p>
             {manifestDiag.loaded && (
-              <p className="text-[11px] text-[#8A8A8A]">
+              <p className="text-[11px] text-[var(--text-secondary)]">
                 {manifestDiag.name} ({manifestDiag.shortName}) · lang={manifestDiag.lang} ·{' '}
                 {manifestDiag.display} · Ícones: {manifestDiag.iconsSummary}
               </p>
             )}
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 space-y-1">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-[#8A8A8A] font-medium">Evento beforeinstallprompt</dt>
+              <dt className="text-[var(--text-secondary)] font-medium">Evento beforeinstallprompt</dt>
               <dd
                 className={
                   isInstallableNatively
-                    ? 'font-bold text-[#22C55E]'
+                    ? 'font-bold text-[var(--status-available)]'
                     : promptEverReceived
-                    ? 'font-bold text-[#FFC400]'
-                    : 'font-bold text-white/85'
+                    ? 'font-bold text-[var(--brand-orange-text)]'
+                    : 'font-bold text-[var(--text-primary)]'
                 }
               >
                 {isInstallableNatively
@@ -323,38 +323,38 @@ export const PWADiagnosticsPanel: React.FC = () => {
                   : 'Não recebido'}
               </dd>
             </div>
-            <p className="text-[11px] text-[#8A8A8A]">
+            <p className="text-[11px] text-[var(--text-secondary)]">
               {promptTimeFormatted ? `Capturado às ${promptTimeFormatted} · ` : ''}
               Dispensada recentemente: {wasRecentlyDismissed ? 'Sim' : 'Não'} · Já instalada antes:{' '}
               {wasPreviouslyInstalled ? 'Sim' : 'Não'}
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 flex items-center justify-between gap-3">
-            <dt className="text-[#8A8A8A] font-medium">Modo atual</dt>
-            <dd className={isInstalled ? 'font-bold text-[#22C55E]' : 'font-bold text-white'}>
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 flex items-center justify-between gap-3">
+            <dt className="text-[var(--text-secondary)] font-medium">Modo atual</dt>
+            <dd className={isInstalled ? 'font-bold text-[var(--status-available)]' : 'font-bold text-[var(--text-primary)]'}>
               {isInstalled ? 'Instalada (standalone)' : 'Navegador'}
             </dd>
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 space-y-1">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 space-y-1">
             <div className="flex items-center justify-between gap-3">
-              <dt className="text-[#8A8A8A] font-medium">Navegador interno</dt>
-              <dd className={environment.isInAppBrowser ? 'font-bold text-[#FFC400]' : 'font-bold text-[#22C55E]'}>
+              <dt className="text-[var(--text-secondary)] font-medium">Navegador interno</dt>
+              <dd className={environment.isInAppBrowser ? 'font-bold text-[var(--brand-orange-text)]' : 'font-bold text-[var(--status-available)]'}>
                 {environment.isInAppBrowser
                   ? `Sim (${environment.inAppName || 'WebView'})`
                   : 'Não'}
               </dd>
             </div>
-            <p className="text-[11px] text-[#8A8A8A]">
+            <p className="text-[11px] text-[var(--text-secondary)]">
               Detetado: SO={environment.os} · Navegador={environment.browser}
               {environment.isInIframe ? ' · Em iframe' : ''}
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-white/10 p-2.5 space-y-1">
-            <dt className="text-[#8A8A8A] font-medium">User-Agent</dt>
-            <dd className="text-[11px] text-white/90 break-all font-mono leading-relaxed">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-2.5 space-y-1">
+            <dt className="text-[var(--text-secondary)] font-medium">User-Agent</dt>
+            <dd className="text-[11px] text-[var(--text-primary)] break-all font-mono leading-relaxed">
               {userAgent}
             </dd>
           </div>
@@ -363,7 +363,7 @@ export const PWADiagnosticsPanel: React.FC = () => {
         <button
           type="button"
           onClick={handleClose}
-          className="inline-flex min-h-[42px] w-full items-center justify-center rounded-xl bg-[#FF8A00] px-4 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer"
+          className="inline-flex min-h-[42px] w-full items-center justify-center rounded-xl bg-[var(--brand-orange)] px-4 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer"
         >
           Fechar
         </button>

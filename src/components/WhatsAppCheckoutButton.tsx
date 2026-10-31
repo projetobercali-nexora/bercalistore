@@ -224,12 +224,14 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         <button
           type="button"
           disabled
-          className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-white/10 px-5 py-3.5 font-display text-sm font-extrabold uppercase tracking-wide text-[#8A8A8A] cursor-not-allowed"
+          className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-5 py-3.5 font-display text-sm font-extrabold uppercase tracking-wide text-[var(--text-secondary)] cursor-not-allowed"
         >
           <Lock className="h-5 w-5 shrink-0" />
           <span>Loja encerrada para encomendas</span>
         </button>
-        <p className="text-xs text-[#8A8A8A] leading-relaxed">{storeSettings.closedMessage}</p>
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          {storeSettings.closedMessage}
+        </p>
       </div>
     );
   }
@@ -240,12 +242,12 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         <button
           type="button"
           disabled
-          className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-white/10 px-5 py-3.5 font-display text-sm font-extrabold uppercase tracking-wide text-[#8A8A8A] cursor-not-allowed"
+          className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-5 py-3.5 font-display text-sm font-extrabold uppercase tracking-wide text-[var(--text-secondary)] cursor-not-allowed"
         >
           <Lock className="h-5 w-5 shrink-0" />
           <span>Confirmar pedido</span>
         </button>
-        <p role="alert" className="text-xs font-medium text-[#EF4444] leading-relaxed">
+        <p role="alert" className="text-xs font-medium text-[var(--status-error)] leading-relaxed">
           {NO_ACTIVE_DELIVERY_ZONES_MESSAGE}
         </p>
       </div>
@@ -258,7 +260,7 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         type="button"
         disabled={isSubmitting || catalogLoading || !hasSelectedProvince}
         onClick={() => void handleConfirmOrder()}
-        className={`flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-bercali-gradient px-5 py-3.5 font-display text-sm sm:text-base font-extrabold uppercase tracking-wide text-[#0A0A0A] shadow-lg transition-transform active:scale-[0.99] cursor-pointer disabled:opacity-55 ${
+        className={`flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-bercali-gradient px-5 py-3.5 font-display text-sm sm:text-base font-extrabold uppercase tracking-wide text-[var(--text-on-accent)] shadow-md transition-transform active:scale-[0.99] cursor-pointer disabled:opacity-55 ${
           isSubmitting ? 'disabled:cursor-wait' : 'disabled:cursor-not-allowed'
         }`}
       >
@@ -283,12 +285,12 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
         persistenceMessage && (
           <div
             role="alert"
-            className="rounded-xl bg-[#0A0A0A] border border-[#EF4444]/60 p-4 space-y-3 text-xs text-white/90"
+            className="rounded-xl bg-[#FEF2F2] border border-[#B91C1C]/35 p-4 space-y-3 text-xs text-[var(--text-primary)]"
           >
             <div className="flex items-start gap-2.5">
-              <AlertCircle className="h-4 w-4 shrink-0 text-[#EF4444] mt-0.5" />
+              <AlertCircle className="h-4 w-4 shrink-0 text-[var(--status-error)] mt-0.5" />
               <div className="space-y-1">
-                <p className="font-display text-xs font-bold uppercase text-[#EF4444]">
+                <p className="font-display text-xs font-bold uppercase text-[var(--status-error)]">
                   Não foi possível confirmar o pedido
                 </p>
                 <p className="leading-relaxed">{persistenceMessage}</p>
@@ -299,16 +301,18 @@ export const WhatsAppCheckoutButton: React.FC<WhatsAppCheckoutButtonProps> = ({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => void handleConfirmOrder()}
-                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#1A1A1A] px-3.5 py-1.5 font-display text-[11px] font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer disabled:opacity-60"
+                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] px-3.5 py-1.5 font-display text-[11px] font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer disabled:opacity-60"
               >
-                <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+                <RefreshCw className="h-3.5 w-3.5 text-[var(--brand-orange-text)]" />
                 <span>Tentar novamente</span>
               </button>
             )}
           </div>
         )}
 
-      <p className="text-xs text-[#8A8A8A] leading-relaxed">{storeSettings.orderDisclaimer}</p>
+      <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+        {storeSettings.orderDisclaimer}
+      </p>
     </div>
   );
 };

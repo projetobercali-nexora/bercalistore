@@ -35,13 +35,15 @@ export const MobileNavigation: React.FC = () => {
 
   const tabClass = ({ isActive }: { isActive: boolean }) =>
     `flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
-      isActive ? 'text-[#FF8A00]' : 'text-[#8A8A8A] hover:text-white'
+      isActive
+        ? 'text-[var(--brand-orange-text)] font-semibold'
+        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
     }`;
 
   return (
     <nav
       aria-label="Navegação rápida móvel"
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0A0A0A]/95 backdrop-blur-md border-t border-white/10 pb-safe"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--bg-surface)]/95 backdrop-blur-md border-t border-[var(--border-subtle)] pb-safe"
     >
       <div
         className={`grid h-[60px] ${
@@ -62,7 +64,7 @@ export const MobileNavigation: React.FC = () => {
           type="button"
           onClick={handleMobileSearch}
           aria-label="Ir para a pesquisa"
-          className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#8A8A8A] hover:text-white transition-colors cursor-pointer"
+          className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
         >
           <Search className="h-5 w-5" />
           <span className="truncate max-w-full">Pesquisa</span>
@@ -72,7 +74,7 @@ export const MobileNavigation: React.FC = () => {
           <span className="relative inline-flex">
             <ShoppingBag className="h-5 w-5" />
             {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-2.5 inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-[#FF8A00] px-1 font-display text-[10px] font-extrabold text-[#0A0A0A] tabular-nums">
+              <span className="absolute -top-1.5 -right-2.5 inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-[var(--brand-orange)] px-1 font-display text-[10px] font-extrabold text-[var(--text-on-accent)] tabular-nums">
                 {totalItemsCount}
               </span>
             )}
@@ -89,7 +91,7 @@ export const MobileNavigation: React.FC = () => {
               trackMetaContact('Navegação Inferior WhatsApp');
             }}
             aria-label={`Contactar ${brandName} pelo WhatsApp`}
-            className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#8A8A8A] hover:text-[#22C55E] transition-colors"
+            className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--status-available)] transition-colors"
           >
             <MessageCircle className="h-5 w-5" />
             <span className="truncate max-w-full">WhatsApp</span>

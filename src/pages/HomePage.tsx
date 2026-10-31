@@ -76,11 +76,11 @@ const HomeProductCard: React.FC<HomeProductCardProps> = React.memo(
     };
 
     return (
-      <article className="group flex h-full flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md shadow-black/40 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
+      <article className="group flex h-full flex-col overflow-hidden rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] transition-transform duration-150 hover:-translate-y-0.5 hover:border-[var(--brand-orange)]/60">
         <Link
           to={`/produto/${product.slug}`}
           aria-label={`Ver detalhes de ${product.name}`}
-          className="relative flex h-44 sm:h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-[#1D1D1F] p-2"
+          className="relative flex h-44 sm:h-52 w-full shrink-0 items-center justify-center overflow-hidden bg-[var(--bg-subtle)] p-2"
         >
           {mainImage ? (
             <img
@@ -96,84 +96,84 @@ const HomeProductCard: React.FC<HomeProductCardProps> = React.memo(
               className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
             />
           ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center">
-            <ImageOff className="h-6 w-6 text-[#8A8A8A]" aria-hidden="true" />
-            <span className="text-[11px] font-medium text-[#8A8A8A]">Sem fotografia</span>
-          </div>
-        )}
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center">
+              <ImageOff className="h-6 w-6 text-[var(--text-secondary)]" aria-hidden="true" />
+              <span className="text-[11px] font-medium text-[var(--text-secondary)]">Sem fotografia</span>
+            </div>
+          )}
 
-        {discountPct !== null && (
-          <span className="absolute top-2 left-2 rounded-lg bg-[#FFC400] px-2 py-0.5 font-display text-[11px] font-extrabold text-[#0A0A0A] shadow-sm tabular-nums">
-            -{discountPct}%
-          </span>
-        )}
-      </Link>
-
-      <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3.5">
-        <h3 className="font-display text-[13px] sm:text-sm font-semibold leading-snug text-white line-clamp-2 min-h-[2.6em]">
-          <Link to={`/produto/${product.slug}`} className="hover:text-[#FF8A00] transition-colors">
-            {product.name}
-          </Link>
-        </h3>
-
-        <div className="mt-2.5 flex items-end justify-between gap-2">
-          <div className="min-w-0 flex flex-col">
-            {discountPct !== null && typeof product.oldPrice === 'number' && (
-              <span className="font-display text-[11px] font-medium text-[#8A8A8A] line-through tabular-nums truncate">
-                {formatKz(product.oldPrice)}
-              </span>
-            )}
-            <span className="font-display text-[15px] sm:text-lg font-extrabold text-[#FFC400] leading-tight tabular-nums truncate">
-              {formatKz(product.price)}
+          {discountPct !== null && (
+            <span className="absolute top-2 left-2 rounded-lg bg-[var(--brand-yellow)] px-2 py-0.5 font-display text-[11px] font-extrabold text-[var(--text-on-accent)] shadow-sm tabular-nums">
+              -{discountPct}%
             </span>
-          </div>
+          )}
+        </Link>
 
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={!canAddNow || stockLimitReached}
-            aria-label={
-              !isStoreActive
-                ? `${product.name} — Loja temporariamente encerrada para novas encomendas`
-                : !purchasable
-                ? `${product.name} — ${statusLabel}`
-                : stockLimitReached
-                ? `Limite de stock atingido no carrinho para ${product.name}`
-                : `Adicionar ${product.name} ao carrinho`
-            }
-            className={`inline-flex h-10 min-w-[44px] shrink-0 items-center justify-center gap-1 rounded-xl px-2.5 sm:px-3 font-display text-[11px] font-extrabold uppercase tracking-wide whitespace-nowrap transition-all ${
-              !canAddNow || stockLimitReached
-                ? 'bg-white/8 text-[#8A8A8A] cursor-not-allowed'
-                : justAdded
-                ? 'bg-[#22C55E] text-[#0A0A0A] shadow-sm cursor-pointer'
-                : 'bg-bercali-gradient text-[#0A0A0A] shadow-sm shadow-[#FF8A00]/20 hover:brightness-105 active:scale-95 cursor-pointer'
-            }`}
-          >
-            {!isStoreActive ? (
-              <span className="text-[10px]">Fechado</span>
-            ) : !purchasable ? (
-              <span className="text-[10px]">
-                {status === 'out_of_stock' ? 'Esgotado' : 'Indisp.'}
+        <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3.5">
+          <h3 className="font-display text-[13px] sm:text-sm font-semibold leading-snug text-[var(--text-primary)] line-clamp-2 min-h-[2.6em]">
+            <Link to={`/produto/${product.slug}`} className="hover:text-[var(--brand-orange-text)] transition-colors">
+              {product.name}
+            </Link>
+          </h3>
+
+          <div className="mt-2.5 flex items-end justify-between gap-2">
+            <div className="min-w-0 flex flex-col">
+              {discountPct !== null && typeof product.oldPrice === 'number' && (
+                <span className="font-display text-[11px] font-medium text-[var(--text-secondary)] line-through tabular-nums truncate">
+                  {formatKz(product.oldPrice)}
+                </span>
+              )}
+              <span className="font-display text-[15px] sm:text-lg font-extrabold text-[var(--text-primary)] leading-tight tabular-nums truncate">
+                {formatKz(product.price)}
               </span>
-            ) : stockLimitReached ? (
-              <span className="text-[10px]">Máx.</span>
-            ) : justAdded ? (
-              <>
-                <Check className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Adicionado</span>
-              </>
-            ) : (
-              <>
-                <ShoppingBag className="h-4 w-4 shrink-0" />
-                <Plus className="h-3.5 w-3.5 -ml-0.5 shrink-0 sm:hidden" />
-                <span className="hidden sm:inline">Adicionar</span>
-              </>
-            )}
-          </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!canAddNow || stockLimitReached}
+              aria-label={
+                !isStoreActive
+                  ? `${product.name} — Loja temporariamente encerrada para novas encomendas`
+                  : !purchasable
+                  ? `${product.name} — ${statusLabel}`
+                  : stockLimitReached
+                  ? `Limite de stock atingido no carrinho para ${product.name}`
+                  : `Adicionar ${product.name} ao carrinho`
+              }
+              className={`inline-flex h-10 min-w-[44px] shrink-0 items-center justify-center gap-1 rounded-xl px-2.5 sm:px-3 font-display text-[11px] font-extrabold uppercase tracking-wide whitespace-nowrap transition-all ${
+                !canAddNow || stockLimitReached
+                  ? 'bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] cursor-not-allowed'
+                  : justAdded
+                  ? 'bg-[var(--status-available)] text-white shadow-sm cursor-pointer'
+                  : 'bg-bercali-gradient text-[var(--text-on-accent)] shadow-sm shadow-[#FF8A00]/20 hover:brightness-105 active:scale-95 cursor-pointer'
+              }`}
+            >
+              {!isStoreActive ? (
+                <span className="text-[10px]">Fechado</span>
+              ) : !purchasable ? (
+                <span className="text-[10px]">
+                  {status === 'out_of_stock' ? 'Esgotado' : 'Indisp.'}
+                </span>
+              ) : stockLimitReached ? (
+                <span className="text-[10px]">Máx.</span>
+              ) : justAdded ? (
+                <>
+                  <Check className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Adicionado</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingBag className="h-4 w-4 shrink-0" />
+                  <Plus className="h-3.5 w-3.5 -ml-0.5 shrink-0 sm:hidden" />
+                  <span className="hidden sm:inline">Adicionar</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
-      </div>
-    </article>
-  );
+      </article>
+    );
   }
 );
 
@@ -296,12 +296,12 @@ export const HomePage: React.FC = () => {
           }
           scrollToCatalog();
         }}
-        className="relative flex w-full items-center rounded-2xl bg-[#161616] border-2 border-[#FF8A00]/85 focus-within:border-[#FFC400] shadow-md shadow-black/40 transition-colors"
+        className="relative flex w-full items-center rounded-2xl bg-[var(--bg-surface)] border-2 border-[var(--brand-orange)] focus-within:border-[var(--brand-orange-text)] shadow-[var(--shadow-card)] transition-colors"
       >
         <label htmlFor="bercali-main-search" className="sr-only">
           Pesquisar produtos na Bercali Store
         </label>
-        <div className="pointer-events-none pl-3.5 pr-2 text-[#FF8A00] shrink-0">
+        <div className="pointer-events-none pl-3.5 pr-2 text-[var(--brand-orange-text)] shrink-0">
           <Search className="h-5 w-5" />
         </div>
         <input
@@ -311,21 +311,21 @@ export const HomePage: React.FC = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="O que procuras hoje?"
           autoComplete="off"
-          className="min-h-[48px] w-full flex-1 bg-transparent py-2.5 pr-2 text-sm sm:text-base text-white placeholder:text-[#8A8A8A] focus:outline-none"
+          className="min-h-[48px] w-full flex-1 bg-transparent py-2.5 pr-2 text-sm sm:text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none"
         />
         {searchQuery.trim().length > 0 && (
           <button
             type="button"
             onClick={() => setSearchQuery('')}
             aria-label="Limpar pesquisa"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8A8A8A] hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         )}
         <button
           type="submit"
-          className="mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-bercali-gradient px-3.5 sm:px-4 font-display text-xs font-extrabold text-[#0A0A0A] whitespace-nowrap transition-transform active:scale-95 cursor-pointer"
+          className="mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-bercali-gradient px-3.5 sm:px-4 font-display text-xs font-extrabold text-[var(--text-on-accent)] whitespace-nowrap transition-transform active:scale-95 cursor-pointer"
         >
           Procurar
         </button>
@@ -333,7 +333,7 @@ export const HomePage: React.FC = () => {
 
       {/* Banner pequeno e discreto apenas quando existir imagem de campanha configurada no painel */}
       {customHeroBannerUrl && (
-        <div className="overflow-hidden rounded-2xl bg-[#141414] border border-white/10 shadow-sm">
+        <div className="overflow-hidden rounded-2xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)]">
           <img
             src={customHeroBannerUrl}
             alt={heroConfig?.title || brandName}
@@ -356,25 +356,25 @@ export const HomePage: React.FC = () => {
       >
         <Link
           to="/categorias"
-          className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[#161616] border border-white/10 px-3.5 py-2 shadow-sm shadow-black/30 hover:border-[#FF8A00]/60 transition-colors whitespace-nowrap"
+          className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3.5 py-2 shadow-[var(--shadow-card)] hover:border-[var(--brand-orange)] transition-colors whitespace-nowrap"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FF8A00]/15 text-[#FF8A00]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[var(--brand-orange-text)]">
             <LayoutGrid className="h-4 w-4" />
           </span>
-          <span className="font-display text-xs sm:text-sm font-bold text-white">Categorias</span>
+          <span className="font-display text-xs sm:text-sm font-bold text-[var(--text-primary)]">Categorias</span>
         </Link>
 
         <button
           type="button"
           onClick={() => handleToggleShortcutTab('promos')}
           aria-pressed={!isFiltering && activeTab === 'promos'}
-          className={`flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 py-2 shadow-sm shadow-black/30 transition-colors whitespace-nowrap cursor-pointer ${
+          className={`flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 py-2 shadow-[var(--shadow-card)] transition-colors whitespace-nowrap cursor-pointer ${
             !isFiltering && activeTab === 'promos'
-              ? 'bg-[#FFC400]/15 border-[#FFC400] text-[#FFC400]'
-              : 'bg-[#161616] border-white/10 text-white hover:border-[#FFC400]/60'
+              ? 'bg-[#FFFBEB] border-[#F59E0B] text-[var(--brand-orange-text)]'
+              : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)]'
           }`}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FFC400]/15 text-[#FFC400]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FEF3C7] text-[var(--brand-orange-text)]">
             <Tag className="h-4 w-4" />
           </span>
           <span className="font-display text-xs sm:text-sm font-bold">Promoções</span>
@@ -384,13 +384,13 @@ export const HomePage: React.FC = () => {
           type="button"
           onClick={() => handleToggleShortcutTab('new')}
           aria-pressed={!isFiltering && activeTab === 'new'}
-          className={`flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 py-2 shadow-sm shadow-black/30 transition-colors whitespace-nowrap cursor-pointer ${
+          className={`flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl border px-3.5 py-2 shadow-[var(--shadow-card)] transition-colors whitespace-nowrap cursor-pointer ${
             !isFiltering && activeTab === 'new'
-              ? 'bg-[#FF8A00]/15 border-[#FF8A00] text-[#FF8A00]'
-              : 'bg-[#161616] border-white/10 text-white hover:border-[#FF8A00]/60'
+              ? 'bg-[#FFF7ED] border-[var(--brand-orange)] text-[var(--brand-orange-text)]'
+              : 'bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)]'
           }`}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FF8A00]/15 text-[#FF8A00]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#FFF7ED] text-[var(--brand-orange-text)]">
             <Flame className="h-4 w-4" />
           </span>
           <span className="font-display text-xs sm:text-sm font-bold">Novidades</span>
@@ -404,12 +404,12 @@ export const HomePage: React.FC = () => {
             onClick={() => {
               trackMetaContact('Atalho Início WhatsApp');
             }}
-            className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[#161616] border border-white/10 px-3.5 py-2 shadow-sm shadow-black/30 hover:border-[#22C55E]/60 transition-colors whitespace-nowrap"
+            className="flex min-h-[48px] shrink-0 items-center gap-2.5 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-3.5 py-2 shadow-[var(--shadow-card)] hover:border-[var(--status-available)] transition-colors whitespace-nowrap"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#22C55E]/15 text-[#22C55E]">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F0FDF4] text-[var(--status-available)]">
               <MessageCircle className="h-4 w-4" />
             </span>
-            <span className="font-display text-xs sm:text-sm font-bold text-white">WhatsApp</span>
+            <span className="font-display text-xs sm:text-sm font-bold text-[var(--text-primary)]">WhatsApp</span>
           </a>
         )}
       </nav>
@@ -417,24 +417,24 @@ export const HomePage: React.FC = () => {
       {/* 4. Faixa de benefícios compacta */}
       <div
         aria-label="Benefícios Bercali Store"
-        className="flex items-center justify-around sm:justify-start sm:gap-6 rounded-xl bg-[#131313] border border-white/8 px-3.5 py-2 text-xs text-white/85 whitespace-nowrap"
+        className="flex items-center justify-around sm:justify-start sm:gap-6 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-3.5 py-2 text-xs text-[var(--text-primary)] whitespace-nowrap"
       >
         <div className="inline-flex items-center gap-1.5 shrink-0">
-          <Truck className="h-3.5 w-3.5 text-[#FF8A00] shrink-0" aria-hidden="true" />
+          <Truck className="h-3.5 w-3.5 text-[var(--brand-orange-text)] shrink-0" aria-hidden="true" />
           <span>Entrega rápida</span>
         </div>
-        <span aria-hidden="true" className="text-white/20">
+        <span aria-hidden="true" className="text-[var(--border-input)]">
           ·
         </span>
         <div className="inline-flex items-center gap-1.5 shrink-0">
-          <ShieldCheck className="h-3.5 w-3.5 text-[#FFC400] shrink-0" aria-hidden="true" />
+          <ShieldCheck className="h-3.5 w-3.5 text-[var(--status-available)] shrink-0" aria-hidden="true" />
           <span>Pagamento seguro</span>
         </div>
-        <span aria-hidden="true" className="hidden sm:inline text-white/20">
+        <span aria-hidden="true" className="hidden sm:inline text-[var(--border-input)]">
           ·
         </span>
-        <div className="hidden sm:inline-flex items-center gap-1.5 shrink-0 text-[#8A8A8A]">
-          <CreditCard className="h-3.5 w-3.5 text-[#FF8A00] shrink-0" aria-hidden="true" />
+        <div className="hidden sm:inline-flex items-center gap-1.5 shrink-0 text-[var(--text-secondary)]">
+          <CreditCard className="h-3.5 w-3.5 text-[var(--brand-orange-text)] shrink-0" aria-hidden="true" />
           <span>Multicaixa Express e pagamento na entrega</span>
         </div>
       </div>
@@ -452,8 +452,8 @@ export const HomePage: React.FC = () => {
             aria-pressed={normalizedSelectedCategory === 'all' && activeTab === 'all'}
             className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               normalizedSelectedCategory === 'all' && activeTab === 'all'
-                ? 'bg-[#FF8A00] font-display font-bold text-[#0A0A0A] shadow-sm shadow-[#FF8A00]/25'
-                : 'bg-[#161616] border border-white/10 text-white/85 hover:border-[#FF8A00]/60 hover:text-white'
+                ? 'bg-[var(--brand-orange)] font-display font-bold text-[var(--text-on-accent)] shadow-sm'
+                : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)]'
             }`}
           >
             <span>Todas</span>
@@ -461,8 +461,8 @@ export const HomePage: React.FC = () => {
               <span
                 className={`text-[11px] tabular-nums ${
                   normalizedSelectedCategory === 'all' && activeTab === 'all'
-                    ? 'text-[#0A0A0A]/80'
-                    : 'text-[#8A8A8A]'
+                    ? 'text-[var(--text-on-accent)]/80'
+                    : 'text-[var(--text-secondary)]'
                 }`}
               >
                 ({products.length})
@@ -480,14 +480,14 @@ export const HomePage: React.FC = () => {
                 aria-pressed={isActive}
                 className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-4 py-1.5 text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-[#FF8A00] font-display font-bold text-[#0A0A0A] shadow-sm shadow-[#FF8A00]/25'
-                    : 'bg-[#161616] border border-white/10 text-white/85 hover:border-[#FF8A00]/60 hover:text-white'
+                    ? 'bg-[var(--brand-orange)] font-display font-bold text-[var(--text-on-accent)] shadow-sm'
+                    : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)]'
                 }`}
               >
                 <span>{cat.name}</span>
                 <span
                   className={`text-[11px] tabular-nums ${
-                    isActive ? 'text-[#0A0A0A]/80' : 'text-[#8A8A8A]'
+                    isActive ? 'text-[var(--text-on-accent)]/80' : 'text-[var(--text-secondary)]'
                   }`}
                 >
                   ({cat.count})
@@ -501,15 +501,15 @@ export const HomePage: React.FC = () => {
       {error && !loading && products.length > 0 && (
         <div
           role="alert"
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-white/15 px-4 py-3 text-xs text-white/90"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] px-4 py-3 text-xs text-[var(--text-primary)]"
         >
           <span>{error}</span>
           <button
             type="button"
             onClick={() => void refreshCatalog()}
-            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#0A0A0A] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer shrink-0"
+            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border-input)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer shrink-0"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <RefreshCw className="h-3.5 w-3.5 text-[var(--brand-orange-text)]" />
             <span>Tentar novamente</span>
           </button>
         </div>
@@ -532,7 +532,7 @@ export const HomePage: React.FC = () => {
         className="scroll-mt-20 pt-0.5 space-y-2.5"
       >
         {hasActiveShortcutOrFilter && !loading && !(error && products.length === 0) && (
-          <div className="flex items-center justify-between gap-2 px-0.5 text-xs text-[#8A8A8A]">
+          <div className="flex items-center justify-between gap-2 px-0.5 text-xs text-[var(--text-secondary)]">
             <span className="tabular-nums">
               {!isFiltering && activeTab === 'promos'
                 ? `Promoções (${displayedCatalogProducts.length})`
@@ -547,7 +547,7 @@ export const HomePage: React.FC = () => {
             <button
               type="button"
               onClick={handleResetFilters}
-              className="font-display text-xs font-bold text-[#FF8A00] hover:underline whitespace-nowrap cursor-pointer"
+              className="font-display text-xs font-bold text-[var(--brand-orange-text)] hover:underline whitespace-nowrap cursor-pointer"
             >
               Limpar filtros
             </button>
@@ -563,15 +563,15 @@ export const HomePage: React.FC = () => {
             {[0, 1, 2, 3].map((idx) => (
               <div
                 key={`home-skeleton-${idx}`}
-                className="flex flex-col overflow-hidden rounded-2xl bg-[#161616] border border-white/10 shadow-md animate-pulse"
+                className="flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] animate-pulse"
               >
-                <div className="h-44 sm:h-52 w-full bg-[#1D1D1F]" />
+                <div className="h-44 sm:h-52 w-full bg-[var(--bg-subtle)]" />
                 <div className="p-2.5 sm:p-3.5 space-y-2.5">
-                  <div className="h-3.5 w-4/5 rounded bg-white/15" />
-                  <div className="h-3.5 w-3/5 rounded bg-white/10" />
+                  <div className="h-3.5 w-4/5 rounded bg-[#E7E5E0]" />
+                  <div className="h-3.5 w-3/5 rounded bg-[var(--bg-subtle)]" />
                   <div className="pt-1 flex items-center justify-between gap-2">
-                    <div className="h-5 w-16 rounded bg-[#FFC400]/25" />
-                    <div className="h-10 w-11 rounded-xl bg-[#FF8A00]/25" />
+                    <div className="h-5 w-16 rounded bg-[#E7E5E0]" />
+                    <div className="h-10 w-11 rounded-xl bg-[#FFEDD5]" />
                   </div>
                 </div>
               </div>

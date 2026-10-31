@@ -100,10 +100,10 @@ export const CatalogPage: React.FC = () => {
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6">
       <div>
         <SpeedLinesDivider className="mb-2.5" />
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
           Catálogo de produtos
         </h1>
-        <p className="mt-1 text-sm text-[#8A8A8A]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Encontra rapidamente o que procuras por nome, categoria ou estado de disponibilidade.
         </p>
       </div>
@@ -111,15 +111,15 @@ export const CatalogPage: React.FC = () => {
       {error && !loading && products.length > 0 && (
         <div
           role="alert"
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[#1A1A1A] border border-white/15 px-4 py-3 text-xs text-white/90"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] px-4 py-3 text-xs text-[var(--text-primary)]"
         >
           <span>{error}</span>
           <button
             type="button"
             onClick={() => void refreshCatalog()}
-            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-[#0A0A0A] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer shrink-0"
+            className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-[var(--border-input)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-display text-xs font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer shrink-0"
           >
-            <RefreshCw className="h-3.5 w-3.5 text-[#FF8A00]" />
+            <RefreshCw className="h-3.5 w-3.5 text-[var(--brand-orange-text)]" />
             <span>Tentar novamente</span>
           </button>
         </div>
@@ -152,8 +152,8 @@ export const CatalogPage: React.FC = () => {
               aria-pressed={onlyAvailable}
               className={`inline-flex min-h-[40px] items-center rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                 onlyAvailable
-                  ? 'bg-[#22C55E] font-display font-bold text-[#0A0A0A]'
-                  : 'bg-[#1A1A1A] border border-white/10 text-white/85 hover:border-white/30'
+                  ? 'bg-[var(--status-available)] font-display font-bold text-white shadow-sm'
+                  : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)]'
               }`}
             >
               Apenas disponíveis
@@ -165,8 +165,8 @@ export const CatalogPage: React.FC = () => {
               aria-pressed={onlyPromos}
               className={`inline-flex min-h-[40px] items-center rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
                 onlyPromos
-                  ? 'bg-[#FFC400] font-display font-bold text-[#0A0A0A]'
-                  : 'bg-[#1A1A1A] border border-white/10 text-white/85 hover:border-white/30'
+                  ? 'bg-[var(--brand-yellow)] font-display font-bold text-[var(--text-on-accent)] shadow-sm'
+                  : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--brand-orange)]'
               }`}
             >
               Em promoção
@@ -174,7 +174,7 @@ export const CatalogPage: React.FC = () => {
           </div>
 
           {!loading && !(error && products.length === 0) && (
-            <div className="flex items-center gap-3 text-xs text-[#8A8A8A]">
+            <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
               <span className="tabular-nums">
                 {filteredProducts.length}{' '}
                 {filteredProducts.length === 1 ? 'produto' : 'produtos'}
@@ -183,7 +183,7 @@ export const CatalogPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={resetAllFilters}
-                  className="font-display font-bold uppercase text-[#FF8A00] hover:underline cursor-pointer"
+                  className="font-display font-bold uppercase text-[var(--brand-orange-text)] hover:underline cursor-pointer"
                 >
                   Limpar filtros
                 </button>

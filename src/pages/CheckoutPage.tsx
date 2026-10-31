@@ -238,44 +238,44 @@ export const CheckoutPage: React.FC = () => {
   if (confirmedOrder) {
     return (
       <div className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-16">
-        <div className="rounded-2xl bg-[#1A1A1A] border border-white/10 p-6 sm:p-8 text-center space-y-5 shadow-xl shadow-black/50">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-[#22C55E]" aria-hidden="true" />
+        <div className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-6 sm:p-8 text-center space-y-5 shadow-[var(--shadow-elevated)]">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-[var(--status-available)]" aria-hidden="true" />
           <div className="space-y-1.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
               Encomenda registada com sucesso
             </h1>
-            <p className="text-sm text-[#8A8A8A]">
+            <p className="text-sm text-[var(--text-secondary)]">
               Guarda o código abaixo para acompanhares o teu pedido junto da {brandName}.
             </p>
           </div>
 
-          <div className="rounded-xl bg-[#0A0A0A] border border-[#FFC400]/40 px-4 py-3.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-[#8A8A8A]">
+          <div className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-4 py-3.5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-secondary)]">
               Código do pedido
             </p>
             <p
               data-testid="confirmed-order-code"
-              className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-[#FFC400] tabular-nums"
+              className="mt-1 font-display text-xl sm:text-2xl font-extrabold text-[var(--text-primary)] tabular-nums"
             >
               {confirmedOrder.orderNumber}
             </p>
           </div>
 
           {confirmedOrder.whatsappUrl ? (
-            <p className="pt-1 text-xs text-[#8A8A8A]">
+            <p className="pt-1 text-xs text-[var(--text-secondary)]">
               Não abriu o WhatsApp?{' '}
               <a
                 href={confirmedOrder.whatsappUrl}
                 onClick={() => {
                   trackMetaContact('Confirmar pedido');
                 }}
-                className="underline underline-offset-4 text-[#FF8A00] hover:text-[#FFC400] transition-colors"
+                className="font-semibold underline underline-offset-4 text-[var(--brand-orange-text)] hover:text-[var(--text-primary)] transition-colors"
               >
                 Toca aqui
               </a>
             </p>
           ) : (
-            <p role="status" className="text-sm text-[#8A8A8A] leading-relaxed">
+            <p role="status" className="text-sm text-[var(--text-secondary)] leading-relaxed">
               Pedido registado. A equipa vai contactar-te no número indicado
             </p>
           )}
@@ -287,17 +287,17 @@ export const CheckoutPage: React.FC = () => {
   if (lines.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4 sm:px-6 py-12 sm:py-16 text-center space-y-4">
-        <ShoppingBag className="mx-auto h-11 w-11 text-[#FF8A00]" aria-hidden="true" />
-        <h1 className="font-display text-2xl font-extrabold text-white">
+        <ShoppingBag className="mx-auto h-11 w-11 text-[var(--brand-orange-text)]" aria-hidden="true" />
+        <h1 className="font-display text-2xl font-extrabold text-[var(--text-primary)]">
           Não tens artigos para finalizar
         </h1>
-        <p className="text-sm text-[#8A8A8A]">
+        <p className="text-sm text-[var(--text-secondary)]">
           Adiciona pelo menos um produto disponível ao carrinho antes de preencheres os dados de
           entrega.
         </p>
         <Link
           to="/catalogo"
-          className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-extrabold uppercase text-[#0A0A0A]"
+          className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-extrabold uppercase text-[var(--text-on-accent)] shadow-sm"
         >
           Ir para o catálogo
         </Link>
@@ -310,7 +310,7 @@ export const CheckoutPage: React.FC = () => {
       <div className="flex items-center justify-between gap-4">
         <Link
           to="/carrinho"
-          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-[#8A8A8A] hover:text-[#FF8A00] transition-colors"
+          className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--brand-orange-text)] transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Voltar ao carrinho</span>
@@ -319,10 +319,10 @@ export const CheckoutPage: React.FC = () => {
 
       <div>
         <SpeedLinesDivider className="mb-2.5" />
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
           {hasWhatsApp ? 'Finalizar encomenda pelo WhatsApp' : 'Finalizar encomenda'}
         </h1>
-        <p className="mt-1 text-sm text-[#8A8A8A]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           {hasWhatsApp
             ? 'Confirma os teus dados e revê o resumo. A encomenda é registada antes de abrir o WhatsApp.'
             : 'Confirma os teus dados e revê o resumo para registares a tua encomenda.'}
@@ -332,14 +332,14 @@ export const CheckoutPage: React.FC = () => {
       {!isStoreActive && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-xl bg-[#1A1A1A] border border-[#FFC400]/50 px-4 py-3.5 text-xs sm:text-sm text-white"
+          className="flex items-start gap-3 rounded-xl bg-[#FFFBEB] border border-[#F59E0B]/45 px-4 py-3.5 text-xs sm:text-sm text-[var(--text-primary)]"
         >
-          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#FFC400]" aria-hidden="true" />
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-orange-text)]" aria-hidden="true" />
           <div>
-            <p className="font-display text-xs font-bold uppercase text-[#FFC400]">
+            <p className="font-display text-xs font-bold uppercase text-[var(--brand-orange-text)]">
               Loja temporariamente encerrada
             </p>
-            <p className="mt-1 text-[#8A8A8A]">{storeSettings.closedMessage}</p>
+            <p className="mt-1 text-[var(--text-secondary)]">{storeSettings.closedMessage}</p>
           </div>
         </div>
       )}
@@ -347,7 +347,7 @@ export const CheckoutPage: React.FC = () => {
       {isStoreActive && touchedSubmit && Object.keys(errors).length > 0 && (
         <div
           role="alert"
-          className="rounded-xl bg-[#1A1A1A] border border-[#EF4444]/60 px-4 py-3 text-xs sm:text-sm text-[#EF4444]"
+          className="rounded-xl bg-[#FEF2F2] border border-[var(--status-error)]/35 px-4 py-3 text-xs sm:text-sm font-medium text-[var(--status-error)]"
         >
           Preenche corretamente todos os campos obrigatórios assinalados antes de confirmar o
           pedido.

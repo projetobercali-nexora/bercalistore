@@ -4,13 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Sem ligação à internet — Bercali Store</title>
-    <meta name="theme-color" content="#0A0A0A" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#FFFFFF" />
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { color-scheme: light; }
       body {
         min-height: 100dvh;
-        background: #0A0A0A;
-        color: #FFFFFF;
+        background: #FAFAF8;
+        color: #171717;
         font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
         display: flex;
         align-items: center;
@@ -24,31 +26,35 @@
       .card {
         max-width: 440px;
         width: 100%;
-        background: #1A1A1A;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
+        background: #FFFFFF;
+        border: 1px solid #E7E5E0;
+        box-shadow: 0 1px 3px rgba(23, 23, 23, 0.05);
+        border-radius: 16px;
         padding: 32px 24px;
         text-align: center;
       }
       .logo-wrap {
-        padding: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 18px;
         display: flex;
         justify-content: center;
       }
       .logo-wrap img {
-        width: 120px;
-        height: 120px;
+        width: 96px;
+        height: 96px;
+        padding: 10px;
+        background: #0A0A0A;
+        border-radius: 16px;
         object-fit: contain;
       }
       h1 {
         font-family: 'Montserrat', sans-serif;
         font-size: 22px;
         font-weight: 800;
+        color: #171717;
         margin-bottom: 12px;
       }
       p {
-        color: #8A8A8A;
+        color: #5B5B57;
         font-size: 15px;
         line-height: 1.55;
         margin-bottom: 24px;

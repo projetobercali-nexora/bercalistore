@@ -9,34 +9,38 @@ interface BrandLogoProps {
 
 const SIZE_CLASSES: Record<
   NonNullable<BrandLogoProps['size']>,
-  { box: string; px: number; pad: string }
+  { box: string; px: number; pad: string; radius: string }
 > = {
   compact: {
-    box: 'h-10 w-10',
-    px: 40,
-    pad: 'p-1',
+    box: 'h-9 w-9',
+    px: 36,
+    pad: 'p-1.5',
+    radius: 'rounded-xl',
   },
   header: {
-    box: 'h-11 w-11 md:h-16 md:w-16',
-    px: 64,
+    box: 'h-9 w-9 md:h-12 md:w-12',
+    px: 48,
     pad: 'p-1 md:p-1.5',
+    radius: 'rounded-xl',
   },
   hero: {
-    box: 'h-28 w-28 sm:h-36 sm:w-36',
-    px: 144,
+    box: 'h-24 w-24 sm:h-32 sm:w-32',
+    px: 128,
     pad: 'p-3',
+    radius: 'rounded-2xl',
   },
   footer: {
-    box: 'h-28 w-28 sm:h-32 sm:w-32',
-    px: 128,
+    box: 'h-20 w-20 sm:h-24 sm:w-24',
+    px: 96,
     pad: 'p-2.5',
+    radius: 'rounded-2xl',
   },
 };
 
 /**
  * Preserva o ficheiro oficial original do logótipo da Bercali Store por predefinição,
- * permitindo sincronizar o logótipo configurado no Painel Administrativo quando definido
- * em `store_settings`, com fallback automático para o logótipo original.
+ * colocando-o numa caixa preta arredondada (#0A0A0A) para garantir leitura nítida
+ * das letras brancas sobre o tema claro, sem alterar a imagem original.
  */
 export const BrandLogo: React.FC<BrandLogoProps> = ({ size = 'header', className = '' }) => {
   const { storeSettings } = useCatalog();
@@ -53,7 +57,9 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ size = 'header', className
   const slogan = storeSettings.slogan || STORE_CONFIG.slogan;
 
   return (
-    <span className={`inline-flex items-center justify-center shrink-0 ${spec.pad} ${className}`}>
+    <span
+      className={`inline-flex items-center justify-center shrink-0 bg-[var(--bg-logo-box)] shadow-xs ${spec.radius} ${spec.pad} ${className}`}
+    >
       <img
         src={effectiveLogoSrc}
         alt={`${brandName} — ${slogan}`}

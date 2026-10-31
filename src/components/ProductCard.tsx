@@ -45,12 +45,12 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
   };
 
   return (
-    <article className="group flex flex-col overflow-hidden rounded-xl bg-[#1A1A1A] border border-white/10 transition-transform duration-150 hover:-translate-y-0.5 hover:border-white/20">
+    <article className="group flex flex-col overflow-hidden rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] transition-transform duration-150 hover:-translate-y-0.5 hover:border-[var(--border-input)]">
       {/* Fotografia principal / espaço reservado discreto */}
       <Link
         to={`/produto/${product.slug}`}
         aria-label={`Ver detalhes de ${product.name}`}
-        className="relative block aspect-[4/3] w-full overflow-hidden bg-[#121212]"
+        className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--bg-subtle)] p-2"
       >
         {mainImage ? (
           <img
@@ -63,19 +63,19 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
             decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setImageError(true)}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+            className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center bg-[#121212]">
-            <ImageOff className="h-7 w-7 text-[#8A8A8A]" aria-hidden="true" />
-            <span className="text-xs font-medium text-[#8A8A8A]">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center bg-[var(--bg-subtle)]">
+            <ImageOff className="h-7 w-7 text-[var(--text-secondary)]" aria-hidden="true" />
+            <span className="text-xs font-medium text-[var(--text-secondary)]">
               Fotografia ainda não adicionada
             </span>
           </div>
         )}
 
         {discountPct !== null && (
-          <span className="absolute top-2.5 left-2.5 rounded-md bg-[#FFC400] px-2 py-0.5 font-display text-[11px] font-extrabold text-[#0A0A0A] tabular-nums">
+          <span className="absolute top-2.5 left-2.5 rounded-md bg-[var(--brand-yellow)] px-2 py-0.5 font-display text-[11px] font-extrabold text-[var(--text-on-accent)] tabular-nums">
             -{discountPct}%
           </span>
         )}
@@ -85,15 +85,19 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         {/* Metadados limpos sem cápsulas estáticas */}
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
-          <span className="text-[#8A8A8A] truncate max-w-[140px]">{product.category}</span>
-          <span aria-hidden="true" className="text-[#8A8A8A]">·</span>
+          <span className="text-[var(--text-secondary)] truncate max-w-[140px]">
+            {product.category}
+          </span>
+          <span aria-hidden="true" className="text-[var(--text-secondary)]">
+            ·
+          </span>
           <span
             className={
               status === 'available'
-                ? 'font-medium text-[#22C55E]'
+                ? 'font-medium text-[var(--status-available)]'
                 : status === 'temporarily_unavailable'
-                ? 'font-medium text-[#FFC400]'
-                : 'font-medium text-[#EF4444]'
+                ? 'font-medium text-[var(--brand-orange-text)]'
+                : 'font-medium text-[var(--status-error)]'
             }
           >
             {statusLabel}
@@ -101,19 +105,22 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
         </div>
 
         {/* Nome do produto */}
-        <h3 className="mt-1.5 font-display text-sm sm:text-base font-bold leading-snug text-white line-clamp-2">
-          <Link to={`/produto/${product.slug}`} className="hover:text-[#FF8A00] transition-colors">
+        <h3 className="mt-1.5 font-display text-sm sm:text-base font-bold leading-snug text-[var(--text-primary)] line-clamp-2">
+          <Link
+            to={`/produto/${product.slug}`}
+            className="hover:text-[var(--brand-orange-text)] transition-colors"
+          >
             {product.name}
           </Link>
         </h3>
 
-        {/* Preço em Kz (âmbar conforme Manual de Marca p. 14) */}
+        {/* Preço em Kz */}
         <div className="mt-auto pt-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="font-display text-base sm:text-lg font-extrabold text-[#FFC400] tabular-nums">
+          <span className="font-display text-base sm:text-lg font-extrabold text-[var(--text-primary)] tabular-nums">
             {formatKz(product.price)}
           </span>
           {discountPct !== null && typeof product.oldPrice === 'number' && (
-            <span className="font-display text-xs font-semibold text-[#8A8A8A] line-through tabular-nums">
+            <span className="font-display text-xs font-semibold text-[var(--text-secondary)] line-through tabular-nums">
               {formatKz(product.oldPrice)}
             </span>
           )}
@@ -136,10 +143,10 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
             }
             className={`inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-display text-xs font-bold uppercase tracking-wide whitespace-nowrap transition-colors ${
               !canAddNow || stockLimitReached
-                ? 'bg-white/8 text-[#8A8A8A] cursor-not-allowed'
+                ? 'bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] cursor-not-allowed'
                 : justAdded
-                ? 'bg-[#22C55E] text-[#0A0A0A] cursor-pointer'
-                : 'bg-[#FF8A00] text-[#0A0A0A] hover:bg-[#FFC400] cursor-pointer'
+                ? 'bg-[var(--status-available)] text-white cursor-pointer'
+                : 'bg-[var(--brand-orange)] text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] cursor-pointer'
             }`}
           >
             {!isStoreActive ? (
@@ -163,7 +170,7 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({ product, pr
 
           <Link
             to={`/produto/${product.slug}`}
-            className="inline-flex min-h-[42px] w-full items-center justify-center rounded-lg border border-[#FF8A00]/60 px-3 py-2 font-display text-xs font-bold uppercase tracking-wide text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors whitespace-nowrap"
+            className="inline-flex min-h-[42px] w-full items-center justify-center rounded-lg border border-[var(--border-input)] bg-[var(--bg-surface)] px-3 py-2 font-display text-xs font-bold uppercase tracking-wide text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors whitespace-nowrap"
           >
             Ver detalhes
           </Link>

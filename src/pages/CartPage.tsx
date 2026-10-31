@@ -22,32 +22,32 @@ export const CartPage: React.FC = () => {
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6">
       <div>
         <SpeedLinesDivider className="mb-2.5" />
-        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-white">
+        <h1 className="font-display text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)]">
           Carrinho de compras
         </h1>
-        <p className="mt-1 text-sm text-[#8A8A8A]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Revê os artigos e quantidades antes de avançares para os dados de entrega.
         </p>
       </div>
 
       {!storageAvailable && (
-        <div className="rounded-xl bg-[#1A1A1A] border border-[#FFC400]/40 p-4 text-xs text-[#8A8A8A]">
-          <strong className="text-[#FFC400]">Aviso de armazenamento:</strong> O teu navegador não permite guardar o carrinho entre visitas. Os artigos permanecem ativos durante esta sessão.
+        <div className="rounded-xl bg-[#FFFBEB] border border-[#F59E0B]/40 p-4 text-xs text-[var(--text-primary)]">
+          <strong className="text-[var(--brand-orange-text)]">Aviso de armazenamento:</strong> O teu navegador não permite guardar o carrinho entre visitas. Os artigos permanecem ativos durante esta sessão.
         </div>
       )}
 
       {lines.length === 0 ? (
-        <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-10 text-center space-y-4">
-          <ShoppingBag className="mx-auto h-11 w-11 text-[#FF8A00]" aria-hidden="true" />
-          <h2 className="font-display text-xl font-bold text-white">
+        <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-10 text-center space-y-4">
+          <ShoppingBag className="mx-auto h-11 w-11 text-[var(--brand-orange-text)]" aria-hidden="true" />
+          <h2 className="font-display text-xl font-bold text-[var(--text-primary)]">
             O teu carrinho está vazio
           </h2>
-          <p className="mx-auto max-w-md text-sm text-[#8A8A8A]">
+          <p className="mx-auto max-w-md text-sm text-[var(--text-secondary)]">
             Explora o catálogo da Bercali Store e adiciona os produtos que pretendes encomendar.
           </p>
           <Link
             to="/catalogo"
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-extrabold uppercase text-[#0A0A0A]"
+            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-6 py-3 font-display text-sm font-extrabold uppercase text-[var(--text-on-accent)] shadow-sm"
           >
             <span>Explorar produtos</span>
             <ArrowRight className="h-4 w-4" />
@@ -64,12 +64,12 @@ export const CartPage: React.FC = () => {
               return (
                 <article
                   key={line.product.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl bg-[#1A1A1A] border border-white/10 p-4"
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-4"
                 >
                   <div className="flex items-start gap-3.5 flex-1 min-w-0">
                     <Link
                       to={`/produto/${line.product.slug}`}
-                      className="h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-[#121212] border border-white/10 flex items-center justify-center"
+                      className="h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-1 flex items-center justify-center"
                     >
                       {thumb ? (
                         <img
@@ -79,44 +79,44 @@ export const CartPage: React.FC = () => {
                           height={120}
                           loading="lazy"
                           referrerPolicy="no-referrer"
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain"
                         />
                       ) : (
-                        <ImageOff className="h-5 w-5 text-[#8A8A8A]" />
+                        <ImageOff className="h-5 w-5 text-[var(--text-secondary)]" />
                       )}
                     </Link>
 
                     <div className="min-w-0 flex-1">
                       <Link
                         to={`/produto/${line.product.slug}`}
-                        className="font-display text-sm sm:text-base font-bold text-white hover:text-[#FF8A00] transition-colors line-clamp-2"
+                        className="font-display text-sm sm:text-base font-bold text-[var(--text-primary)] hover:text-[var(--brand-orange-text)] transition-colors line-clamp-2"
                       >
                         {line.product.name}
                       </Link>
-                      <p className="mt-1 text-xs text-[#8A8A8A] tabular-nums">
-                        Preço unitário: <strong className="text-white">{formatKz(line.product.price)}</strong>
+                      <p className="mt-1 text-xs text-[var(--text-secondary)] tabular-nums">
+                        Preço unitário: <strong className="font-semibold text-[var(--text-primary)]">{formatKz(line.product.price)}</strong>
                       </p>
-                      <p className="mt-1 font-display text-sm font-extrabold text-[#FFC400] tabular-nums">
+                      <p className="mt-1 font-display text-sm font-extrabold text-[var(--text-primary)] tabular-nums">
                         Subtotal: {formatKz(line.lineSubtotal)}
                       </p>
                     </div>
                   </div>
 
                   {/* Controlos de quantidade e remoção */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-white/10 pt-3 sm:pt-0">
-                    <div className="inline-flex items-center rounded-xl bg-[#0A0A0A] border border-white/15">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 border-[var(--border-subtle)] pt-3 sm:pt-0">
+                    <div className="inline-flex items-center rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-input)]">
                       <button
                         type="button"
                         onClick={() => setItemQuantity(line.product, line.quantity - 1)}
                         disabled={line.quantity <= 1}
                         aria-label={`Diminuir quantidade de ${line.product.name}`}
-                        className="inline-flex h-11 w-11 items-center justify-center text-white disabled:opacity-40 hover:text-[#FF8A00] cursor-pointer disabled:cursor-not-allowed"
+                        className="inline-flex h-11 w-11 items-center justify-center text-[var(--text-primary)] disabled:opacity-40 hover:text-[var(--brand-orange-text)] cursor-pointer disabled:cursor-not-allowed"
                       >
                         <Minus className="h-4 w-4" />
                       </button>
                       <span
                         aria-live="polite"
-                        className="min-w-[38px] text-center font-display text-sm font-bold text-white tabular-nums"
+                        className="min-w-[38px] text-center font-display text-sm font-bold text-[var(--text-primary)] tabular-nums"
                       >
                         {line.quantity}
                       </span>
@@ -125,7 +125,7 @@ export const CartPage: React.FC = () => {
                         onClick={() => setItemQuantity(line.product, line.quantity + 1)}
                         disabled={line.quantity >= maxQty}
                         aria-label={`Aumentar quantidade de ${line.product.name}`}
-                        className="inline-flex h-11 w-11 items-center justify-center text-white disabled:opacity-40 hover:text-[#FF8A00] cursor-pointer disabled:cursor-not-allowed"
+                        className="inline-flex h-11 w-11 items-center justify-center text-[var(--text-primary)] disabled:opacity-40 hover:text-[var(--brand-orange-text)] cursor-pointer disabled:cursor-not-allowed"
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -135,7 +135,7 @@ export const CartPage: React.FC = () => {
                       type="button"
                       onClick={() => removeItem(line.product.id)}
                       aria-label={`Remover ${line.product.name} do carrinho`}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[#0A0A0A] border border-white/15 text-[#8A8A8A] hover:border-[#EF4444] hover:text-[#EF4444] transition-colors cursor-pointer"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-input)] text-[var(--text-secondary)] hover:border-[var(--status-error)] hover:text-[var(--status-error)] transition-colors cursor-pointer"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -146,28 +146,28 @@ export const CartPage: React.FC = () => {
           </div>
 
           {/* Resumo lateral do carrinho */}
-          <aside className="lg:col-span-4 rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-6 space-y-4">
-            <h2 className="font-display text-lg font-bold text-white">Resumo do carrinho</h2>
+          <aside className="lg:col-span-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-6 space-y-4">
+            <h2 className="font-display text-lg font-bold text-[var(--text-primary)]">Resumo do carrinho</h2>
 
-            <dl className="space-y-2.5 text-sm border-t border-white/10 pt-4">
+            <dl className="space-y-2.5 text-sm border-t border-[var(--border-subtle)] pt-4">
               <div className="flex items-center justify-between">
-                <dt className="text-[#8A8A8A]">Total de artigos</dt>
-                <dd className="font-display font-bold text-white tabular-nums">
+                <dt className="text-[var(--text-secondary)]">Total de artigos</dt>
+                <dd className="font-display font-bold text-[var(--text-primary)] tabular-nums">
                   {totalItemsCount}
                 </dd>
               </div>
               <div className="flex items-center justify-between">
-                <dt className="text-[#8A8A8A]">Entrega</dt>
-                <dd className="text-xs text-[#8A8A8A] text-right">
+                <dt className="text-[var(--text-secondary)]">Entrega</dt>
+                <dd className="text-xs text-[var(--text-secondary)] text-right">
                   {storeSettings.freeDeliveryThresholdKz &&
                   subtotalKz >= storeSettings.freeDeliveryThresholdKz
                     ? 'Grátis (atingiu o valor mínimo)'
                     : 'Calculada / confirmada no passo seguinte'}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between border-t border-white/10 pt-3">
-                <dt className="font-display text-base font-bold text-white">Subtotal</dt>
-                <dd className="font-display text-xl font-extrabold text-[#FFC400] tabular-nums">
+              <div className="flex items-baseline justify-between border-t border-[var(--border-subtle)] pt-3">
+                <dt className="font-display text-base font-bold text-[var(--text-primary)]">Subtotal</dt>
+                <dd className="font-display text-xl font-extrabold text-[var(--text-primary)] tabular-nums">
                   {formatKz(subtotalKz)}
                 </dd>
               </div>
@@ -176,12 +176,12 @@ export const CartPage: React.FC = () => {
             {!isStoreActive && (
               <div
                 role="status"
-                className="rounded-xl bg-[#FFC400]/10 border border-[#FFC400]/35 p-3.5 text-xs text-white/90 leading-relaxed"
+                className="rounded-xl bg-[#FFFBEB] border border-[#F59E0B]/40 p-3.5 text-xs text-[var(--text-primary)] leading-relaxed"
               >
-                <p className="font-display font-bold text-[#FFC400] uppercase tracking-wide mb-1">
+                <p className="font-display font-bold text-[var(--brand-orange-text)] uppercase tracking-wide mb-1">
                   Loja temporariamente encerrada
                 </p>
-                <p>{storeSettings.closedMessage}</p>
+                <p className="text-[var(--text-secondary)]">{storeSettings.closedMessage}</p>
               </div>
             )}
 
@@ -189,7 +189,7 @@ export const CartPage: React.FC = () => {
               {isStoreActive ? (
                 <Link
                   to="/finalizar"
-                  className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-5 py-3 font-display text-sm font-extrabold uppercase text-[#0A0A0A] shadow-lg"
+                  className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-bercali-gradient px-5 py-3 font-display text-sm font-extrabold uppercase text-[var(--text-on-accent)] shadow-md"
                 >
                   <span>Finalizar pedido</span>
                   <ArrowRight className="h-4 w-4" />
@@ -198,7 +198,7 @@ export const CartPage: React.FC = () => {
                 <button
                   type="button"
                   disabled
-                  className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/15 px-5 py-3 font-display text-sm font-bold uppercase text-[#8A8A8A] cursor-not-allowed"
+                  className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-5 py-3 font-display text-sm font-bold uppercase text-[var(--text-secondary)] cursor-not-allowed"
                 >
                   <Lock className="h-4 w-4" />
                   <span>Encomendas temporariamente suspensas</span>
@@ -207,7 +207,7 @@ export const CartPage: React.FC = () => {
 
               <Link
                 to="/catalogo"
-                className="flex min-h-[46px] w-full items-center justify-center rounded-xl border border-[#FF8A00]/60 px-5 py-2.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors"
+                className="flex min-h-[46px] w-full items-center justify-center rounded-xl border border-[var(--border-input)] bg-[var(--bg-subtle)] px-5 py-2.5 font-display text-xs font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors"
               >
                 Continuar a comprar
               </Link>

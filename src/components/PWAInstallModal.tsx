@@ -119,23 +119,23 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="pwa-install-modal-title"
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-3 sm:p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-3 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-[#1A1A1A] border border-white/15 p-4 sm:p-5 shadow-2xl space-y-3.5 max-h-[calc(100dvh-24px)] overflow-y-auto"
+        className="w-full max-w-sm rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 sm:p-5 shadow-[var(--shadow-elevated)] space-y-3.5 max-h-[calc(100dvh-24px)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <BrandLogo size="compact" />
             <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[#FF8A00] truncate">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--brand-orange-text)] truncate">
                 {instruction.deviceLabel}
               </p>
               <h3
                 id="pwa-install-modal-title"
-                className="font-display text-base font-bold text-white leading-snug"
+                className="font-display text-base font-bold text-[var(--text-primary)] leading-snug"
               >
                 {instruction.title}
               </h3>
@@ -145,7 +145,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Fechar painel de instalação"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#8A8A8A] hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -153,15 +153,15 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
 
         {canUseDirectNativeInstall ? (
           <div className="space-y-3">
-            <p className="rounded-xl bg-[#0A0A0A] border border-white/10 px-3.5 py-3 text-xs text-white/90 leading-relaxed">
+            <p className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-3.5 py-3 text-xs text-[var(--text-primary)] leading-relaxed">
               A instalação direta está disponível neste dispositivo. Toca abaixo para adicionar a{' '}
-              <strong className="text-white">{brandName}</strong> ao teu ecrã.
+              <strong className="font-semibold text-[var(--text-primary)]">{brandName}</strong> ao teu ecrã.
             </p>
             <button
               type="button"
               disabled={isPrompting}
               onClick={() => void onTriggerNativeInstall?.()}
-              className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-[#FF8A00] px-4 py-2.5 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+              className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-[var(--brand-orange)] px-4 py-2.5 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
               {isPrompting ? (
                 <>
@@ -179,10 +179,10 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
         ) : (
           <>
             {/* Instrução principal adaptada ao navegador/dispositivo */}
-            <div className="rounded-xl bg-[#0A0A0A] border border-[#FF8A00]/40 p-3.5">
-              <p className="flex items-start gap-2.5 font-display text-sm font-bold text-white leading-relaxed">
+            <div className="rounded-xl bg-[#FFF7ED] border border-[#FDBA74]/60 p-3.5">
+              <p className="flex items-start gap-2.5 font-display text-sm font-bold text-[var(--text-primary)] leading-relaxed">
                 <DeviceIcon
-                  className="mt-0.5 h-4 w-4 shrink-0 text-[#FF8A00]"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-orange-text)]"
                   aria-hidden="true"
                 />
                 <span>{instruction.primaryInstruction}</span>
@@ -191,10 +191,10 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
 
             {/* Passos detalhados apenas quando a instalação nativa não está disponível */}
             {instruction.steps.length > 0 && (
-              <ol className="rounded-xl bg-[#0A0A0A] border border-white/10 p-3.5 space-y-2.5 text-xs text-white/90 leading-relaxed">
+              <ol className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-3.5 space-y-2.5 text-xs text-[var(--text-primary)] leading-relaxed">
                 {instruction.steps.map((step, index) => (
                   <li key={`pwa-step-${index}`} className="flex items-start gap-2.5">
-                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FF8A00]/15 border border-[#FF8A00]/40 font-display text-[11px] font-bold text-[#FFC400] tabular-nums">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FFF7ED] border border-[#FDBA74]/70 font-display text-[11px] font-bold text-[var(--brand-orange-text)] tabular-nums">
                       {index + 1}
                     </span>
                     <span className="pt-0.5">{step}</span>
@@ -216,16 +216,16 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
                   <button
                     type="button"
                     onClick={() => void handleCopyLink()}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-[#0A0A0A] px-3 py-2 font-display text-xs font-bold text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-[var(--border-input)] bg-[var(--bg-surface)] px-3 py-2 font-display text-xs font-bold text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer"
                   >
                     {copied ? (
                       <>
-                        <Check className="h-4 w-4 shrink-0 text-[#FFC400]" />
-                        <span className="text-[#FFC400]">Link copiado</span>
+                        <Check className="h-4 w-4 shrink-0 text-[var(--status-available)]" />
+                        <span className="text-[var(--status-available)]">Link copiado</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="h-4 w-4 shrink-0 text-[#FF8A00]" />
+                        <Copy className="h-4 w-4 shrink-0 text-[var(--brand-orange-text)]" />
                         <span>Copiar link</span>
                       </>
                     )}
@@ -235,7 +235,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
                 {instruction.showOpenInChromeButton && (
                   <a
                     href={instruction.openInChromeUrl}
-                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#FF8A00] px-3 py-2 font-display text-xs font-bold text-[#0A0A0A] hover:bg-[#FFC400] transition-colors text-center"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[var(--brand-orange)] px-3 py-2 font-display text-xs font-bold text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors text-center"
                   >
                     <ExternalLink className="h-4 w-4 shrink-0" />
                     <span>Abrir no Chrome</span>
@@ -246,21 +246,21 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
 
             {/* Indicação quando já instalada ou dispensada recentemente */}
             {instruction.statusNote && (
-              <p className="rounded-xl bg-[#0A0A0A] border border-white/10 px-3 py-2.5 text-xs text-white/85 leading-relaxed">
+              <p className="rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] px-3 py-2.5 text-xs text-[var(--text-secondary)] leading-relaxed">
                 {instruction.statusNote}
               </p>
             )}
 
             {instruction.secondaryHelper && (
-              <p className="text-xs text-[#8A8A8A] leading-relaxed">
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                 {instruction.secondaryHelper}
               </p>
             )}
 
             {instruction.contextNotice && (
-              <div className="flex items-start gap-2 rounded-xl bg-[#0A0A0A] border border-[#FFC400]/35 px-3 py-2.5 text-xs text-white/90 leading-relaxed">
+              <div className="flex items-start gap-2 rounded-xl bg-[#FFFBEB] border border-[#F59E0B]/40 px-3 py-2.5 text-xs text-[var(--text-primary)] leading-relaxed">
                 <AlertCircle
-                  className="mt-0.5 h-4 w-4 shrink-0 text-[#FFC400]"
+                  className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-orange-text)]"
                   aria-hidden="true"
                 />
                 <span>{instruction.contextNotice}</span>
@@ -273,7 +273,7 @@ export const PWAInstallModal: React.FC<PWAInstallModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-white/15 bg-[#0A0A0A] px-4 py-2.5 font-display text-xs font-bold uppercase text-white hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border-input)] bg-[var(--bg-subtle)] px-4 py-2.5 font-display text-xs font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer"
           >
             Fechar
           </button>

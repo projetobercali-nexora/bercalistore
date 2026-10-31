@@ -45,13 +45,13 @@ export const CookieConsentBanner: React.FC = () => {
     <section
       role="region"
       aria-label="Preferências de cookies"
-      className="fixed inset-x-3 bottom-[calc(68px+env(safe-area-inset-bottom,0px))] md:inset-x-auto md:right-5 md:bottom-5 md:max-w-md z-40 rounded-2xl bg-[#161616]/95 backdrop-blur-md border border-white/15 p-3.5 sm:p-4 shadow-2xl shadow-black/70"
+      className="fixed inset-x-3 bottom-[calc(68px+env(safe-area-inset-bottom,0px))] md:inset-x-auto md:right-5 md:bottom-5 md:max-w-md z-40 rounded-2xl bg-[var(--bg-surface)]/95 backdrop-blur-md border border-[var(--border-subtle)] p-3.5 sm:p-4 shadow-[var(--shadow-elevated)]"
     >
       <div className="flex flex-col gap-3">
-        <p className="text-xs text-white/85 leading-relaxed">
+        <p className="text-xs text-[var(--text-primary)] leading-relaxed">
           Usamos cookies de medição para melhorar a tua experiência na loja. Podes aceitar ou
           recusar a qualquer momento.{' '}
-          <Link to="/privacidade" className="text-[#FF8A00] hover:underline font-medium">
+          <Link to="/privacidade" className="text-[var(--brand-orange-text)] hover:underline font-medium">
             Saber mais
           </Link>
         </p>
@@ -60,14 +60,14 @@ export const CookieConsentBanner: React.FC = () => {
           <button
             type="button"
             onClick={() => handleChoice('declined')}
-            className="inline-flex min-h-[38px] items-center justify-center rounded-xl border border-white/15 bg-[#0A0A0A] px-3.5 py-1.5 font-display text-xs font-bold text-white/85 hover:border-white/35 hover:text-white transition-colors cursor-pointer"
+            className="inline-flex min-h-[38px] items-center justify-center rounded-xl border border-[var(--border-input)] bg-[var(--bg-subtle)] px-3.5 py-1.5 font-display text-xs font-bold text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer"
           >
             Recusar
           </button>
           <button
             type="button"
             onClick={() => handleChoice('accepted')}
-            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-bercali-gradient px-4 py-1.5 font-display text-xs font-extrabold text-[#0A0A0A] shadow-sm transition-transform active:scale-95 cursor-pointer"
+            className="inline-flex min-h-[38px] items-center justify-center rounded-xl bg-bercali-gradient px-4 py-1.5 font-display text-xs font-extrabold text-[var(--text-on-accent)] shadow-sm transition-transform active:scale-95 cursor-pointer"
           >
             Aceitar
           </button>

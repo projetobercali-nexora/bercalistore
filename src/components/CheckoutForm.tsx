@@ -32,10 +32,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
   disabled = false,
 }) => {
   const inputBase =
-    'w-full min-h-[48px] rounded-xl bg-[#0A0A0A] border px-4 py-3 text-base text-white placeholder:text-[#8A8A8A] focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed';
+    'w-full min-h-[48px] rounded-xl bg-[var(--bg-surface)] border px-4 py-3 text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none transition-colors disabled:bg-[var(--bg-subtle)] disabled:opacity-65 disabled:cursor-not-allowed';
 
   const borderClass = (hasError: boolean) =>
-    hasError ? 'border-[#EF4444] focus:border-[#EF4444]' : 'border-white/15 focus:border-[#FF8A00]';
+    hasError
+      ? 'border-[var(--status-error)] focus:border-[var(--status-error)] focus:ring-2 focus:ring-[#B91C1C]/15'
+      : 'border-[var(--border-input)] focus:border-[var(--brand-orange)] focus:ring-2 focus:ring-[#FF8A00]/20';
 
   const hasConfiguredZones = deliveryZones.length > 0;
   const selectedRule = findMatchingDeliveryZone(deliveryZones, {
@@ -48,22 +50,26 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
   const municipalityPlaceholder = getMunicipalityPlaceholder(values.province);
 
   return (
-    <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-6">
+    <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-6">
       <div className="mb-5">
-        <h2 className="font-display text-lg sm:text-xl font-bold text-white">
+        <h2 className="font-display text-lg sm:text-xl font-bold text-[var(--text-primary)]">
           Dados para entrega
         </h2>
-        <p className="mt-1 text-sm text-[#8A8A8A]">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Indica o teu nome, telefone e província de entrega para registarmos a tua encomenda. Os
-          campos com <span className="text-[#FF8A00] font-semibold">*</span> são obrigatórios.
+          campos com <span className="text-[var(--brand-orange-text)] font-semibold">*</span> são
+          obrigatórios.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Nome completo */}
         <div className="sm:col-span-2">
-          <label htmlFor="checkout-fullName" className="block text-sm font-medium text-white mb-1.5">
-            Nome completo <span className="text-[#FF8A00]">*</span>
+          <label
+            htmlFor="checkout-fullName"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Nome completo <span className="text-[var(--brand-orange-text)]">*</span>
           </label>
           <input
             id="checkout-fullName"
@@ -80,7 +86,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             className={`${inputBase} ${borderClass(Boolean(errors.fullName))}`}
           />
           {errors.fullName && (
-            <p id="error-fullName" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-fullName"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {errors.fullName}
             </p>
           )}
@@ -88,8 +98,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Telefone */}
         <div>
-          <label htmlFor="checkout-phone" className="block text-sm font-medium text-white mb-1.5">
-            Número de telefone <span className="text-[#FF8A00]">*</span>
+          <label
+            htmlFor="checkout-phone"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Número de telefone <span className="text-[var(--brand-orange-text)]">*</span>
           </label>
           <input
             id="checkout-phone"
@@ -107,7 +120,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             className={`${inputBase} ${borderClass(Boolean(errors.phone))}`}
           />
           {errors.phone && (
-            <p id="error-phone" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-phone"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {errors.phone}
             </p>
           )}
@@ -115,8 +132,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* E-mail opcional */}
         <div>
-          <label htmlFor="checkout-email" className="block text-sm font-medium text-white mb-1.5">
-            E-mail <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+          <label
+            htmlFor="checkout-email"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            E-mail <span className="text-xs font-normal text-[var(--text-secondary)]">(opcional)</span>
           </label>
           <input
             id="checkout-email"
@@ -133,7 +153,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             className={`${inputBase} ${borderClass(Boolean(errors.email))}`}
           />
           {errors.email && (
-            <p id="error-email" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-email"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {errors.email}
             </p>
           )}
@@ -141,8 +165,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Província de entrega * (apenas zonas ativas da base de dados) */}
         <div>
-          <label htmlFor="checkout-province" className="block text-sm font-medium text-white mb-1.5">
-            Província de entrega <span className="text-[#FF8A00]">*</span>
+          <label
+            htmlFor="checkout-province"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Província de entrega <span className="text-[var(--brand-orange-text)]">*</span>
           </label>
           <select
             id="checkout-province"
@@ -179,7 +206,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
               Boolean(provinceError) || (!loadingZones && !hasConfiguredZones)
             )}`}
           >
-            <option value="">
+            <option value="" className="bg-white text-[#171717]">
               {loadingZones
                 ? 'A carregar províncias...'
                 : hasConfiguredZones
@@ -194,7 +221,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
                 <option
                   key={`prov-opt-${rule.id ?? idx}-${label}`}
                   value={label}
-                  className="bg-[#0A0A0A] text-white"
+                  className="bg-white text-[#171717]"
                 >
                   {label} — {feeText}
                   {etaText}
@@ -203,7 +230,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             })}
           </select>
           {(provinceError || (!loadingZones && !hasConfiguredZones)) && (
-            <p id="error-province" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-province"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {provinceError ?? NO_ACTIVE_DELIVERY_ZONES_MESSAGE}
             </p>
           )}
@@ -211,8 +242,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Município (opcional) */}
         <div>
-          <label htmlFor="checkout-municipality" className="block text-sm font-medium text-white mb-1.5">
-            Município <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+          <label
+            htmlFor="checkout-municipality"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Município{' '}
+            <span className="text-xs font-normal text-[var(--text-secondary)]">(opcional)</span>
           </label>
           <input
             id="checkout-municipality"
@@ -227,7 +262,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             className={`${inputBase} ${borderClass(Boolean(errors.municipality))}`}
           />
           {errors.municipality && (
-            <p id="error-municipality" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-municipality"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {errors.municipality}
             </p>
           )}
@@ -235,8 +274,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Bairro (opcional) */}
         <div className="sm:col-span-2">
-          <label htmlFor="checkout-neighborhood" className="block text-sm font-medium text-white mb-1.5">
-            Bairro <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+          <label
+            htmlFor="checkout-neighborhood"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Bairro{' '}
+            <span className="text-xs font-normal text-[var(--text-secondary)]">(opcional)</span>
           </label>
           <input
             id="checkout-neighborhood"
@@ -251,7 +294,11 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             className={`${inputBase} ${borderClass(Boolean(errors.neighborhood))}`}
           />
           {errors.neighborhood && (
-            <p id="error-neighborhood" role="alert" className="mt-1.5 text-xs font-medium text-[#EF4444]">
+            <p
+              id="error-neighborhood"
+              role="alert"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
+            >
               {errors.neighborhood}
             </p>
           )}
@@ -259,9 +306,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Endereço ou referência (opcional) */}
         <div className="sm:col-span-2">
-          <label htmlFor="checkout-addressReference" className="block text-sm font-medium text-white mb-1.5">
+          <label
+            htmlFor="checkout-addressReference"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
             Endereço ou referência de entrega{' '}
-            <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+            <span className="text-xs font-normal text-[var(--text-secondary)]">(opcional)</span>
           </label>
           <input
             id="checkout-addressReference"
@@ -279,7 +329,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             <p
               id="error-addressReference"
               role="alert"
-              className="mt-1.5 text-xs font-medium text-[#EF4444]"
+              className="mt-1.5 text-xs font-medium text-[var(--status-error)]"
             >
               {errors.addressReference}
             </p>
@@ -288,8 +338,12 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
         {/* Observações opcionais */}
         <div className="sm:col-span-2">
-          <label htmlFor="checkout-notes" className="block text-sm font-medium text-white mb-1.5">
-            Observações <span className="text-xs font-normal text-[#8A8A8A]">(opcional)</span>
+          <label
+            htmlFor="checkout-notes"
+            className="block text-sm font-medium text-[var(--text-primary)] mb-1.5"
+          >
+            Observações{' '}
+            <span className="text-xs font-normal text-[var(--text-secondary)]">(opcional)</span>
           </label>
           <textarea
             id="checkout-notes"
@@ -299,7 +353,7 @@ export const CheckoutForm: React.FC<CheckoutFormProps> = ({
             value={values.notes}
             onChange={(e) => onChange('notes', e.target.value)}
             placeholder="Horário preferencial de entrega ou outras indicações úteis..."
-            className="w-full rounded-xl bg-[#0A0A0A] border border-white/15 px-4 py-3 text-base text-white placeholder:text-[#8A8A8A] focus:border-[#FF8A00] focus:outline-none transition-colors resize-y disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-[var(--bg-surface)] border border-[var(--border-input)] px-4 py-3 text-base text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--brand-orange)] focus:ring-2 focus:ring-[#FF8A00]/20 focus:outline-none transition-colors resize-y disabled:bg-[var(--bg-subtle)] disabled:opacity-65 disabled:cursor-not-allowed"
           />
         </div>
       </div>

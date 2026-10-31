@@ -19,22 +19,24 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
   const freeThreshold = storeSettings.freeDeliveryThresholdKz;
 
   return (
-    <div className="rounded-xl bg-[#1A1A1A] border border-white/10 p-5 sm:p-6">
-      <h2 className="font-display text-lg sm:text-xl font-bold text-white">
+    <div className="rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-6">
+      <h2 className="font-display text-lg sm:text-xl font-bold text-[var(--text-primary)]">
         Resumo da encomenda
       </h2>
 
       {/* Lista de produtos */}
-      <ul className="mt-4 divide-y divide-white/10">
+      <ul className="mt-4 divide-y divide-[var(--border-subtle)]">
         {summary.lines.map((line) => (
           <li key={line.product.id} className="py-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white leading-snug">{line.product.name}</p>
-              <p className="mt-0.5 text-xs text-[#8A8A8A] tabular-nums">
+              <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">
+                {line.product.name}
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)] tabular-nums">
                 {line.quantity} × {formatKz(line.product.price)}
               </p>
             </div>
-            <span className="font-display text-sm font-bold text-white tabular-nums shrink-0">
+            <span className="font-display text-sm font-bold text-[var(--text-primary)] tabular-nums shrink-0">
               {formatKz(line.lineSubtotal)}
             </span>
           </li>
@@ -42,28 +44,28 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
       </ul>
 
       {/* Totais */}
-      <dl className="mt-4 space-y-2.5 border-t border-white/10 pt-4 text-sm">
+      <dl className="mt-4 space-y-2.5 border-t border-[var(--border-subtle)] pt-4 text-sm">
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-[#8A8A8A]">
+          <dt className="text-[var(--text-secondary)]">
             Subtotal ({summary.totalItemsCount}{' '}
             {summary.totalItemsCount === 1 ? 'artigo' : 'artigos'})
           </dt>
-          <dd className="font-display font-bold text-white tabular-nums">
+          <dd className="font-display font-bold text-[var(--text-primary)] tabular-nums">
             {formatKz(summary.productsSubtotalKz)}
           </dd>
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <dt className="text-[#8A8A8A]">Taxa de entrega</dt>
-          <dd className="font-medium text-white tabular-nums text-right">
+          <dt className="text-[var(--text-secondary)]">Taxa de entrega</dt>
+          <dd className="font-medium text-[var(--text-primary)] tabular-nums text-right">
             {summary.delivery.label}
           </dd>
         </div>
 
         {summary.delivery.estimatedTime && (
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-[#8A8A8A]">Prazo de entrega</dt>
-            <dd className="font-medium text-white text-right">
+            <dt className="text-[var(--text-secondary)]">Prazo de entrega</dt>
+            <dd className="font-medium text-[var(--text-primary)] text-right">
               {summary.delivery.estimatedTime}
             </dd>
           </div>
@@ -72,22 +74,24 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
         {freeThreshold !== null &&
           freeThreshold > 0 &&
           summary.productsSubtotalKz < freeThreshold && (
-            <p className="text-xs text-[#FFC400] tabular-nums">
+            <p className="text-xs font-medium text-[var(--brand-orange-text)] tabular-nums">
               Faltam {formatKz(freeThreshold - summary.productsSubtotalKz)} para usufruíres de
               entrega gratuita.
             </p>
           )}
 
-        <div className="flex items-baseline justify-between gap-2 border-t border-white/10 pt-3">
-          <dt className="font-display text-base font-bold text-white">Total estimado</dt>
-          <dd className="font-display text-lg font-extrabold text-[#FFC400] tabular-nums text-right">
+        <div className="flex items-baseline justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
+          <dt className="font-display text-base font-bold text-[var(--text-primary)]">
+            Total estimado
+          </dt>
+          <dd className="font-display text-lg font-extrabold text-[var(--text-primary)] tabular-nums text-right">
             {summary.estimatedTotalKz !== null
               ? formatKz(summary.estimatedTotalKz)
               : formatKz(summary.productsSubtotalKz)}
           </dd>
         </div>
         {summary.estimatedTotalKz === null && (
-          <p className="text-xs text-[#8A8A8A] text-right">
+          <p className="text-xs text-[var(--text-secondary)] text-right">
             Acresce taxa de entrega a confirmar pela loja conforme a localização.
           </p>
         )}
@@ -95,20 +99,22 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
 
       {/* Dados de entrega preenchidos pelo cliente */}
       {hasDeliveryAddress && (
-        <div className="mt-5 border-t border-white/10 pt-4">
-          <h3 className="font-display text-xs font-bold uppercase tracking-wider text-[#FF8A00]">
+        <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+          <h3 className="font-display text-xs font-bold uppercase tracking-wider text-[var(--brand-orange-text)]">
             Dados de entrega indicados
           </h3>
-          <div className="mt-2 space-y-1 text-xs text-white/85">
+          <div className="mt-2 space-y-1 text-xs text-[var(--text-primary)]">
             {customer.fullName.trim() && (
               <p>
-                <span className="text-[#8A8A8A]">Cliente:</span> {customer.fullName.trim()}
+                <span className="text-[var(--text-secondary)]">Cliente:</span>{' '}
+                {customer.fullName.trim()}
                 {customer.phone.trim() ? ` · ${customer.phone.trim()}` : ''}
               </p>
             )}
             {(customer.email ?? '').trim() && (
               <p>
-                <span className="text-[#8A8A8A]">E-mail:</span> {(customer.email ?? '').trim()}
+                <span className="text-[var(--text-secondary)]">E-mail:</span>{' '}
+                {(customer.email ?? '').trim()}
               </p>
             )}
             {((customer.deliveryZone ?? '').trim() ||
@@ -116,7 +122,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
               customer.municipality.trim() ||
               customer.neighborhood.trim()) && (
               <p>
-                <span className="text-[#8A8A8A]">Zona:</span>{' '}
+                <span className="text-[var(--text-secondary)]">Zona:</span>{' '}
                 {[
                   customer.neighborhood.trim(),
                   customer.municipality.trim(),
@@ -128,7 +134,7 @@ export const OrderSummary: React.FC<OrderSummaryProps> = ({ summary, customer })
             )}
             {customer.addressReference.trim() && (
               <p>
-                <span className="text-[#8A8A8A]">Referência:</span>{' '}
+                <span className="text-[var(--text-secondary)]">Referência:</span>{' '}
                 {customer.addressReference.trim()}
               </p>
             )}

@@ -274,7 +274,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
           <div
             role="tablist"
             aria-label="Selecionar tipo de multimédia"
-            className="inline-flex rounded-lg bg-[#1A1A1A] border border-white/10 p-1"
+            className="inline-flex rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-subtle)] p-1"
           >
             <button
               type="button"
@@ -283,8 +283,8 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
               onClick={() => setMediaMode('photos')}
               className={`inline-flex min-h-[38px] items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                 mediaMode === 'photos'
-                  ? 'bg-[#FF8A00] font-display font-bold text-[#0A0A0A]'
-                  : 'text-white/80 hover:text-white'
+                  ? 'bg-[var(--brand-orange)] font-display font-bold text-[var(--text-on-accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Images className="h-4 w-4" />
@@ -298,8 +298,8 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
               onClick={() => setMediaMode('video')}
               className={`inline-flex min-h-[38px] items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
                 mediaMode === 'video'
-                  ? 'bg-[#FF8A00] font-display font-bold text-[#0A0A0A]'
-                  : 'text-white/80 hover:text-white'
+                  ? 'bg-[var(--brand-orange)] font-display font-bold text-[var(--text-on-accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               <Film className="h-4 w-4" />
@@ -311,7 +311,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
 
       {/* Área principal da galeria — largura total no telemóvel, foto inteira sem cortes */}
       {mediaMode === 'video' && product.video ? (
-        <div className="w-full overflow-hidden bg-[#141414] lg:rounded-2xl">
+        <div className="w-full overflow-hidden bg-[var(--bg-subtle)] lg:rounded-2xl lg:border lg:border-[var(--border-subtle)]">
           <div className="aspect-video w-full bg-[#0A0A0A]">
             <video
               controls
@@ -327,14 +327,14 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
             </video>
           </div>
           {product.video.caption && (
-            <p className="px-4 py-2.5 text-xs text-[#8A8A8A] border-t border-white/10">
+            <p className="px-4 py-2.5 text-xs text-[var(--text-secondary)] border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
               {product.video.caption}
             </p>
           )}
         </div>
       ) : (
         <>
-          <div className="relative w-full overflow-hidden bg-[#161618] lg:rounded-2xl">
+          <div className="relative w-full overflow-hidden bg-[var(--bg-subtle)] border-y border-[var(--border-subtle)] lg:border lg:rounded-2xl">
             {hasPhotos ? (
               <>
                 <div
@@ -347,7 +347,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                     return (
                       <div
                         key={`${product.id}-slide-${idx}`}
-                        className="flex h-[310px] sm:h-[400px] lg:h-[460px] w-full shrink-0 snap-center items-center justify-center bg-[#161618]"
+                        className="flex h-[310px] sm:h-[400px] lg:h-[460px] w-full shrink-0 snap-center items-center justify-center bg-[var(--bg-subtle)] p-2"
                       >
                         {!isBroken ? (
                           <button
@@ -373,8 +373,11 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                           </button>
                         ) : (
                           <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-6 text-center">
-                            <ImageOff className="h-10 w-10 text-[#8A8A8A]" aria-hidden="true" />
-                            <p className="font-display text-sm font-bold text-white">
+                            <ImageOff
+                              className="h-10 w-10 text-[var(--text-secondary)]"
+                              aria-hidden="true"
+                            />
+                            <p className="font-display text-sm font-bold text-[var(--text-primary)]">
                               Fotografia indisponível
                             </p>
                           </div>
@@ -391,7 +394,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                       type="button"
                       onClick={() => selectSlide(activeIndex - 1)}
                       aria-label="Fotografia anterior"
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/65 border border-white/15 text-white hover:bg-black/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 border border-[var(--border-subtle)] text-[var(--text-primary)] shadow-sm hover:bg-white hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
@@ -399,7 +402,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                       type="button"
                       onClick={() => selectSlide(activeIndex + 1)}
                       aria-label="Fotografia seguinte"
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/65 border border-white/15 text-white hover:bg-black/85 hover:border-[#FF8A00] hover:text-[#FF8A00] transition-colors cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/90 border border-[var(--border-subtle)] text-[var(--text-primary)] shadow-sm hover:bg-white hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </button>
@@ -407,17 +410,17 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                 )}
 
                 {/* Contador estilo Alibaba sobre a imagem */}
-                <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/75 backdrop-blur-sm px-3 py-1 text-xs font-medium text-white tabular-nums">
+                <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-[#171717]/80 backdrop-blur-sm px-3 py-1 text-xs font-medium text-white tabular-nums">
                   Fotos {activeIndex + 1}/{product.images.length}
                 </div>
               </>
             ) : (
-              <div className="flex h-[280px] sm:h-[360px] w-full flex-col items-center justify-center gap-2.5 p-6 text-center bg-[#161618]">
-                <ImageOff className="h-10 w-10 text-[#8A8A8A]" aria-hidden="true" />
-                <p className="font-display text-sm font-bold text-white">
+              <div className="flex h-[280px] sm:h-[360px] w-full flex-col items-center justify-center gap-2.5 p-6 text-center bg-[var(--bg-subtle)]">
+                <ImageOff className="h-10 w-10 text-[var(--text-secondary)]" aria-hidden="true" />
+                <p className="font-display text-sm font-bold text-[var(--text-primary)]">
                   Espaço reservado para fotografia oficial
                 </p>
-                <p className="max-w-xs text-xs text-[#8A8A8A]">
+                <p className="max-w-xs text-xs text-[var(--text-secondary)]">
                   Este artigo ainda não possui fotografias reais associadas no catálogo.
                 </p>
               </div>
@@ -442,10 +445,10 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ product }) => {
                     onClick={() => selectSlide(idx)}
                     aria-label={`Ver fotografia ${idx + 1} de ${product.images.length}`}
                     aria-current={isSelected ? 'true' : undefined}
-                    className={`relative h-16 w-16 sm:h-[68px] sm:w-[68px] shrink-0 overflow-hidden rounded-xl bg-[#161618] p-1 transition-all cursor-pointer ${
+                    className={`relative h-16 w-16 sm:h-[68px] sm:w-[68px] shrink-0 overflow-hidden rounded-xl bg-[var(--bg-subtle)] p-1 transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-2 border-[#FF8A00] ring-2 ring-[#FF8A00]/30 opacity-100'
-                        : 'border border-white/15 opacity-65 hover:opacity-100 hover:border-white/35'
+                        ? 'border-2 border-[var(--brand-orange)] ring-2 ring-[#FF8A00]/25 opacity-100'
+                        : 'border border-[var(--border-subtle)] opacity-75 hover:opacity-100 hover:border-[var(--border-input)]'
                     }`}
                   >
                     <img

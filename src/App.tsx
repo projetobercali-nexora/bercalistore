@@ -16,6 +16,7 @@ import { CatalogPage } from './pages/CatalogPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { HomePage } from './pages/HomePage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { StoreInfoPage } from './pages/StoreInfoPage';
 
 const ProductDetailPage = lazy(() =>
   import('./pages/ProductDetailPage').then((m) => ({ default: m.ProductDetailPage }))
@@ -41,8 +42,8 @@ const RouteLoadingFallback: React.FC = () => (
     aria-label="A carregar página"
     className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-[60dvh] animate-pulse space-y-4"
   >
-    <div className="h-7 w-40 rounded-lg bg-[#1A1A1A]" />
-    <div className="h-64 w-full rounded-2xl bg-[#161616] border border-white/10" />
+    <div className="h-7 w-40 rounded-lg bg-[var(--bg-subtle)]" />
+    <div className="h-64 w-full rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)]" />
   </div>
 );
 
@@ -52,10 +53,10 @@ export function App() {
       <CatalogProvider>
         <CartProvider>
           <ScrollToTopOnNavigate />
-          <div className="flex min-h-dvh flex-col bg-[#0A0A0A] text-white px-safe">
+          <div className="flex min-h-dvh flex-col bg-[var(--bg-page)] text-[var(--text-primary)] px-safe">
             <a
               href="#conteudo-principal"
-              className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[#FF8A00] focus:px-4 focus:py-2 focus:font-display focus:text-xs focus:font-bold focus:text-[#0A0A0A]"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-[var(--brand-orange)] focus:px-4 focus:py-2 focus:font-display focus:text-xs focus:font-bold focus:text-[var(--text-on-accent)]"
             >
               Saltar para o conteúdo principal
             </a>
@@ -74,6 +75,7 @@ export function App() {
                   <Route path="/produto/:slug" element={<ProductDetailPage />} />
                   <Route path="/carrinho" element={<CartPage />} />
                   <Route path="/finalizar" element={<CheckoutPage />} />
+                  <Route path="/informacoes" element={<StoreInfoPage />} />
                   <Route path="/privacidade" element={<LegalPage mode="privacy" />} />
                   <Route path="/termos" element={<LegalPage mode="terms" />} />
                   <Route path="*" element={<NotFoundPage />} />

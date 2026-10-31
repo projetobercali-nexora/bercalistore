@@ -40,19 +40,19 @@ export const InstallPrompt: React.FC = () => {
         role="status"
         aria-live="polite"
         aria-label="Nova versão disponível"
-        className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[#1A1A1A] border border-[#FF8A00]/45 p-4 shadow-2xl`}
+        className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-elevated)]`}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-display text-sm font-bold text-white">Nova versão disponível</p>
-            <p className="mt-0.5 text-xs text-[#8A8A8A]">
+            <p className="font-display text-sm font-bold text-[var(--text-primary)]">Nova versão disponível</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
               Atualiza para veres as melhorias mais recentes da loja.
             </p>
           </div>
           <button
             type="button"
             onClick={() => void applyUpdate()}
-            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#FF8A00] px-3.5 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer"
+            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-orange)] px-3.5 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer"
           >
             <RefreshCw className="h-3.5 w-3.5 shrink-0" />
             <span>Atualizar</span>
@@ -90,15 +90,15 @@ export const InstallPrompt: React.FC = () => {
       {shouldShowTimedInvite && !showInstructions && (
         <aside
           aria-label={`Convite para instalar a aplicação ${brandName}`}
-          className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[#1A1A1A] border border-white/15 p-4 shadow-2xl`}
+          className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-elevated)]`}
         >
           <div className="flex items-start gap-3">
             <BrandLogo size="compact" />
             <div className="flex-1 min-w-0">
-              <p className="font-display text-sm font-bold text-white">
+              <p className="font-display text-sm font-bold text-[var(--text-primary)]">
                 Adiciona a {brandName} ao teu ecrã
               </p>
-              <p className="mt-1 text-xs text-[#8A8A8A] leading-relaxed">
+              <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
                 {environment.isIOS
                   ? environment.browser === 'safari' && !environment.isInAppBrowser
                     ? `${IOS_SAFARI_INSTALL_INSTRUCTION}.`
@@ -110,7 +110,7 @@ export const InstallPrompt: React.FC = () => {
                   type="button"
                   disabled={isPrompting}
                   onClick={() => void handleInstallAction()}
-                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-[#FF8A00] px-3.5 py-2 font-display text-xs font-bold uppercase text-[#0A0A0A] hover:bg-[#FFC400] transition-colors cursor-pointer disabled:opacity-60"
+                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-orange)] px-3.5 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer disabled:opacity-60"
                 >
                   {environment.isIOS ? (
                     <>
@@ -127,7 +127,7 @@ export const InstallPrompt: React.FC = () => {
                 <button
                   type="button"
                   onClick={dismissPrompt}
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-[#8A8A8A] hover:text-white transition-colors cursor-pointer"
+                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                 >
                   Agora não
                 </button>
@@ -137,7 +137,7 @@ export const InstallPrompt: React.FC = () => {
               type="button"
               onClick={dismissPrompt}
               aria-label="Dispensar convite de instalação"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#8A8A8A] hover:bg-white/10 hover:text-white cursor-pointer"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
