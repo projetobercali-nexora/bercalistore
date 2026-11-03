@@ -27,12 +27,21 @@
           promptReceived: false,
           promptReceivedAt: null,
           appInstalled: false,
+          listenersAttached: false,
         });
         window.__bercaliDeferredInstallPrompt = state.deferredPrompt;
         window.__bercaliAppInstalled = state.appInstalled;
 
+        if (state.listenersAttached) {
+          return;
+        }
+        state.listenersAttached = true;
+
         window.addEventListener('beforeinstallprompt', function (event) {
           event.preventDefault();
+          if (state.deferredPrompt === event) {
+            return;
+          }
           state.deferredPrompt = event;
           state.promptReceived = true;
           state.promptReceivedAt = Date.now();

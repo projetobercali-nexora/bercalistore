@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  CheckCircle2,
   ChevronRight,
   CreditCard,
-  Download,
   ExternalLink,
   Globe,
-  Loader2,
   Mail,
   MapPin,
   MessageCircle,
@@ -17,11 +14,10 @@ import {
   Truck,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
-import { PWAInstallModal } from '../components/PWAInstallModal';
+import { PWAInstallAction } from '../components/PWAInstallAction';
 import { SpeedLinesDivider } from '../components/SpeedLinesDivider';
 import { STORE_CONFIG } from '../config/store';
 import { useCatalog } from '../context/CatalogContext';
-import { usePWAInstall } from '../hooks/usePWAInstall';
 import {
   buildWhatsAppContactMessage,
   buildWhatsAppUrl,
@@ -34,18 +30,6 @@ export const StoreInfoPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { storeSettings, whatsappNumber, hasWhatsApp, loading } = useCatalog();
-  const {
-    isInstalled,
-    isInstallableNatively,
-    isPrompting,
-    wasRecentlyDismissed,
-    wasPreviouslyInstalled,
-    environment,
-    triggerNativeInstall,
-    clearOutcome,
-  } = usePWAInstall(location.pathname);
-
-  const [showManualInstallModal, setShowManualInstallModal] = useState(false);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
   const slogan = storeSettings.slogan || STORE_CONFIG.slogan;
@@ -76,30 +60,6 @@ export const StoreInfoPage: React.FC = () => {
     { to: '/categorias', label: 'Categorias' },
     { to: '/carrinho', label: 'Carrinho' },
   ];
-
-  const handleInstallClick = async () => {
-    if (isInstalled || isPrompting) {
-      return;
-    }
-
-    if (environment.isIOS) {
-      setShowManualInstallModal(true);
-      return;
-    }
-
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'unavailable' || outcome === 'failed') {
-      clearOutcome();
-      setShowManualInstallModal(true);
-    }
-  };
-
-  const handleNativeInstallFromModal = async () => {
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'accepted') {
-      setShowManualInstallModal(false);
-    }
-  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6">
@@ -138,7 +98,7 @@ export const StoreInfoPage: React.FC = () => {
         aria-labelledby="store-info-identity"
         className="rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)] p-5 sm:p-7 space-y-5"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+        <div className="flex flex-col items-start sm:flex-row sm:items-center gap-4 sm:gap-5">
           <BrandLogo size="footer" />
           <div className="space-y-1.5 min-w-0">
             <h2
@@ -219,8 +179,8 @@ export const StoreInfoPage: React.FC = () => {
           </div>
         )}
 
-        {/* Botões principais: WhatsApp e Instalar app (incluindo estado APP INSTALADA) */}
-        <div className="pt-4 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-3">
+        {/* Botões principais: WhatsApp e Instalar App */}
+        <div className="pt-4 border-t border-[var(--border-subtle)] flex flex-wrap items-start gap-3">
           {whatsappHref && (
             <a
               href={whatsappHref}
@@ -236,34 +196,7 @@ export const StoreInfoPage: React.FC = () => {
             </a>
           )}
 
-          {isInstalled ? (
-            <span
-              role="status"
-              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-[#15803D]/30 bg-[#15803D]/10 px-4 py-2.5 font-display text-xs sm:text-sm font-extrabold uppercase text-[var(--status-available)] whitespace-nowrap"
-            >
-              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>APP INSTALADA</span>
-            </span>
-          ) : (
-            <button
-              type="button"
-              disabled={isPrompting}
-              onClick={() => void handleInstallClick()}
-              className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-[var(--border-input)] bg-[var(--bg-subtle)] px-4 py-2.5 font-display text-xs sm:text-sm font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors whitespace-nowrap cursor-pointer disabled:opacity-60 disabled:cursor-wait"
-            >
-              {isPrompting ? (
-                <>
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--brand-orange-text)]" />
-                  <span>A aguardar...</span>
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 shrink-0 text-[var(--brand-orange-text)]" />
-                  <span>Instalar app</span>
-                </>
-              )}
-            </button>
-          )}
+          <PWAInstallAction pathname={location.pathname} variant="page" />
         </div>
       </section>
 
@@ -432,20 +365,6 @@ export const StoreInfoPage: React.FC = () => {
           </div>
         </section>
       </div>
-
-      {!isInstalled && (
-        <PWAInstallModal
-          open={showManualInstallModal}
-          brandName={brandName}
-          environment={environment}
-          isInstallableNatively={isInstallableNatively}
-          isPrompting={isPrompting}
-          onTriggerNativeInstall={handleNativeInstallFromModal}
-          wasRecentlyDismissed={wasRecentlyDismissed}
-          wasPreviouslyInstalled={wasPreviouslyInstalled}
-          onClose={() => setShowManualInstallModal(false)}
-        />
-      )}
     </div>
   );
 };

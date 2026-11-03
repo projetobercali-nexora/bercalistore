@@ -58,7 +58,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({ size = 'header', className
 
   return (
     <span
-      className={`inline-flex items-center justify-center shrink-0 bg-[var(--bg-logo-box)] shadow-xs ${spec.radius} ${spec.pad} ${className}`}
+      className={`inline-flex w-fit items-center justify-center shrink-0 bg-[var(--bg-logo-box)] shadow-xs ${spec.radius} ${spec.pad} ${className}`}
     >
       <img
         src={effectiveLogoSrc}

@@ -111,7 +111,7 @@ self.addEventListener('fetch', (event) => {
             return offlinePage;
           }
           return new Response(
-            '<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sem ligação à internet</title></head><body style="background:#0A0A0A;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center"><div><h1>Sem ligação à internet</h1><p style="color:#8A8A8A;margin-top:8px">Verifica a tua ligação e tenta novamente.</p></div></body></html>',
+            '<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light"><meta name="theme-color" content="#FFFFFF"><title>Sem ligação à internet</title></head><body style="background:#FAFAF8;color:#171717;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:24px;text-align:center"><div><h1>Sem ligação à internet</h1><p style="color:#5B5B57;margin-top:8px">Verifica a tua ligação e tenta novamente.</p></div></body></html>',
             {
               status: 200,
               headers: { 'Content-Type': 'text/html; charset=utf-8' },

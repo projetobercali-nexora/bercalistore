@@ -37,7 +37,6 @@ export const PWADiagnosticsPanel: React.FC = () => {
     isInstallableNatively,
     promptEverReceived,
     promptReceivedAt,
-    wasRecentlyDismissed,
     wasPreviouslyInstalled,
     environment,
   } = usePWAInstall(location.pathname);
@@ -325,8 +324,7 @@ export const PWADiagnosticsPanel: React.FC = () => {
             </div>
             <p className="text-[11px] text-[var(--text-secondary)]">
               {promptTimeFormatted ? `Capturado às ${promptTimeFormatted} · ` : ''}
-              Dispensada recentemente: {wasRecentlyDismissed ? 'Sim' : 'Não'} · Já instalada antes:{' '}
-              {wasPreviouslyInstalled ? 'Sim' : 'Não'}
+              Já instalada antes: {wasPreviouslyInstalled ? 'Sim' : 'Não'}
             </p>
           </div>
 

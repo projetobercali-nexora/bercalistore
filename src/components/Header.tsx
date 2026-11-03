@@ -1,59 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Download, Info, Loader2, Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
+import { Info, Menu, MessageCircle, Search, ShoppingBag, X } from 'lucide-react';
 import { STORE_CONFIG } from '../config/store';
 import { useCartCount } from '../context/CartContext';
 import { useCatalog } from '../context/CatalogContext';
-import { usePWAInstall } from '../hooks/usePWAInstall';
 import { buildWhatsAppContactMessage, buildWhatsAppUrl } from '../utils/checkout';
 import { trackMetaContact } from '../utils/metaPixel';
 import { BrandLogo } from './BrandLogo';
-import { PWAInstallModal } from './PWAInstallModal';
+import { PWAInstallAction } from './PWAInstallAction';
 
 export const Header: React.FC = () => {
   const totalItemsCount = useCartCount();
   const { whatsappNumber, hasWhatsApp, storeSettings } = useCatalog();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const {
-    isInstalled,
-    isInstallableNatively,
-    isPrompting,
-    wasRecentlyDismissed,
-    wasPreviouslyInstalled,
-    environment,
-    triggerNativeInstall,
-    clearOutcome,
-  } = usePWAInstall(location.pathname);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname, location.search]);
 
   const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
-
-  const handleMobileDrawerInstall = async () => {
-    if (isInstalled || isPrompting) return;
-    setMobileMenuOpen(false);
-    if (environment.isIOS) {
-      setShowInstallModal(true);
-      return;
-    }
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'unavailable' || outcome === 'failed') {
-      clearOutcome();
-      setShowInstallModal(true);
-    }
-  };
-
-  const handleNativeInstallFromModal = async () => {
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'accepted') {
-      setShowInstallModal(false);
-    }
-  };
   const directWhatsappHref = hasWhatsApp
     ? buildWhatsAppUrl(
         whatsappNumber,
@@ -245,26 +212,7 @@ export const Header: React.FC = () => {
             </nav>
 
             <div className="mt-auto pt-5 border-t border-[var(--border-subtle)] space-y-2.5">
-              {!isInstalled && (
-                <button
-                  type="button"
-                  disabled={isPrompting}
-                  onClick={() => void handleMobileDrawerInstall()}
-                  className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-input)] bg-[var(--bg-subtle)] px-4 font-display text-xs font-bold uppercase text-[var(--text-primary)] hover:border-[var(--brand-orange)] hover:text-[var(--brand-orange-text)] transition-colors cursor-pointer disabled:opacity-60"
-                >
-                  {isPrompting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin text-[var(--brand-orange-text)]" />
-                      <span>A aguardar...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 text-[var(--brand-orange-text)]" />
-                      <span>Instalar aplicação</span>
-                    </>
-                  )}
-                </button>
-              )}
+              <PWAInstallAction pathname={location.pathname} variant="drawer" />
 
               {directWhatsappHref && (
                 <a
@@ -286,20 +234,6 @@ export const Header: React.FC = () => {
             </div>
           </aside>
         </div>
-      )}
-
-      {!isInstalled && (
-        <PWAInstallModal
-          open={showInstallModal}
-          brandName={brandName}
-          environment={environment}
-          isInstallableNatively={isInstallableNatively}
-          isPrompting={isPrompting}
-          onTriggerNativeInstall={handleNativeInstallFromModal}
-          wasRecentlyDismissed={wasRecentlyDismissed}
-          wasPreviouslyInstalled={wasPreviouslyInstalled}
-          onClose={() => setShowInstallModal(false)}
-        />
       )}
     </>
   );

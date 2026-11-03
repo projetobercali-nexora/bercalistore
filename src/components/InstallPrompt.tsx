@@ -1,164 +1,46 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { Download, RefreshCw, Share, X } from 'lucide-react';
-import { STORE_CONFIG } from '../config/store';
-import { useCatalog } from '../context/CatalogContext';
+import { RefreshCw } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { IOS_SAFARI_INSTALL_INSTRUCTION } from '../utils/pwa';
-import { BrandLogo } from './BrandLogo';
-import { PWAInstallModal } from './PWAInstallModal';
 
 export const InstallPrompt: React.FC = () => {
   const location = useLocation();
-  const { storeSettings } = useCatalog();
-  const {
-    isInstalled,
-    isInstallableNatively,
-    isPrompting,
-    wasRecentlyDismissed,
-    wasPreviouslyInstalled,
-    environment,
-    updateAvailable,
-    isCheckoutRoute,
-    shouldShowTimedInvite,
-    triggerNativeInstall,
-    dismissPrompt,
-    applyUpdate,
-  } = usePWAInstall(location.pathname);
+  const { updateAvailable, isCheckoutRoute, applyUpdate } = usePWAInstall(location.pathname);
 
-  const [showInstructions, setShowInstructions] = useState(false);
+  if (!updateAvailable || isCheckoutRoute) {
+    return null;
+  }
 
-  const brandName = storeSettings.brandName || STORE_CONFIG.brandName;
   const isProductDetail = location.pathname.startsWith('/produto/');
   const floatingBottomClass = isProductDetail
     ? 'bottom-[calc(136px+env(safe-area-inset-bottom,0px))] md:bottom-24'
     : 'bottom-[calc(72px+env(safe-area-inset-bottom,0px))] md:bottom-6';
 
-  if (updateAvailable && !isCheckoutRoute) {
-    return (
-      <aside
-        role="status"
-        aria-live="polite"
-        aria-label="Nova versão disponível"
-        className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-elevated)]`}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-display text-sm font-bold text-[var(--text-primary)]">Nova versão disponível</p>
-            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-              Atualiza para veres as melhorias mais recentes da loja.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void applyUpdate()}
-            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-orange)] px-3.5 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer"
-          >
-            <RefreshCw className="h-3.5 w-3.5 shrink-0" />
-            <span>Atualizar</span>
-          </button>
-        </div>
-      </aside>
-    );
-  }
-
-  if (isInstalled) {
-    return null;
-  }
-
-  const handleInstallAction = async () => {
-    if (isPrompting) return;
-    if (environment.isIOS) {
-      setShowInstructions(true);
-      return;
-    }
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'unavailable' || outcome === 'failed') {
-      setShowInstructions(true);
-    }
-  };
-
-  const handleNativeInstallFromModal = async () => {
-    const outcome = await triggerNativeInstall();
-    if (outcome === 'accepted') {
-      setShowInstructions(false);
-    }
-  };
-
   return (
-    <>
-      {shouldShowTimedInvite && !showInstructions && (
-        <aside
-          aria-label={`Convite para instalar a aplicação ${brandName}`}
-          className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-elevated)]`}
+    <aside
+      role="status"
+      aria-live="polite"
+      aria-label="Nova versão disponível"
+      className={`fixed ${floatingBottomClass} left-4 right-4 max-w-sm mx-auto sm:mx-0 sm:left-6 sm:right-auto z-40 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-4 shadow-[var(--shadow-elevated)]`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-display text-sm font-bold text-[var(--text-primary)]">
+            Nova versão disponível
+          </p>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            Atualiza para veres as melhorias mais recentes da loja.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void applyUpdate()}
+          className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-orange)] px-3.5 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer"
         >
-          <div className="flex items-start gap-3">
-            <BrandLogo size="compact" />
-            <div className="flex-1 min-w-0">
-              <p className="font-display text-sm font-bold text-[var(--text-primary)]">
-                Adiciona a {brandName} ao teu ecrã
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)] leading-relaxed">
-                {environment.isIOS
-                  ? environment.browser === 'safari' && !environment.isInAppBrowser
-                    ? `${IOS_SAFARI_INSTALL_INSTRUCTION}.`
-                    : 'Vê como adicionar a loja ao ecrã principal do teu iPhone ou iPad.'
-                  : 'Acede mais depressa ao catálogo sempre que precisares, como uma aplicação.'}
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isPrompting}
-                  onClick={() => void handleInstallAction()}
-                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg bg-[var(--brand-orange)] px-3.5 py-2 font-display text-xs font-bold uppercase text-[var(--text-on-accent)] hover:bg-[var(--brand-yellow)] transition-colors cursor-pointer disabled:opacity-60"
-                >
-                  {environment.isIOS ? (
-                    <>
-                      <Share className="h-3.5 w-3.5" />
-                      <span>Como instalar</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Instalar</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={dismissPrompt}
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                >
-                  Agora não
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={dismissPrompt}
-              aria-label="Dispensar convite de instalação"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </aside>
-      )}
-
-      <PWAInstallModal
-        open={showInstructions}
-        brandName={brandName}
-        environment={environment}
-        isInstallableNatively={isInstallableNatively}
-        isPrompting={isPrompting}
-        onTriggerNativeInstall={handleNativeInstallFromModal}
-        wasRecentlyDismissed={wasRecentlyDismissed}
-        wasPreviouslyInstalled={wasPreviouslyInstalled}
-        onClose={() => {
-          setShowInstructions(false);
-          dismissPrompt();
-        }}
-      />
-    </>
+          <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+          <span>Atualizar</span>
+        </button>
+      </div>
+    </aside>
   );
 };
